@@ -257,13 +257,25 @@ async def run_app_then_export_as_pdf(
                 options=rasterization_options,
             )
 
-    pdf_data = Exporter().export_as_pdf(
-        app=file_manager.app,
-        session_view=session_view,
-        png_fallbacks=png_fallbacks,
-        include_inputs=include_inputs,
-        webpdf=webpdf,
-    )
+    # Detect slides layout and use dedicated async slides exporter
+    layout_config = file_manager.read_layout_config()
+    is_slides = layout_config is not None and layout_config.type == "slides"
+
+    exporter = Exporter()
+    if is_slides:
+        pdf_data = await exporter.export_as_slides_pdf(
+            app=file_manager.app,
+            session_view=session_view,
+            include_inputs=include_inputs,
+        )
+    else:
+        pdf_data = exporter.export_as_pdf(
+            app=file_manager.app,
+            session_view=session_view,
+            png_fallbacks=png_fallbacks,
+            include_inputs=include_inputs,
+            webpdf=webpdf,
+        )
     return pdf_data, did_error
 
 
