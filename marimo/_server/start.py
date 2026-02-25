@@ -20,7 +20,10 @@ from marimo._runtime.commands import SerializedCLIArgs
 from marimo._server.config import (
     StarletteServerStateInit,
 )
-from marimo._server.file_router import AppFileRouter
+from marimo._server.file_router import (
+    AppFileRouter,
+    LazyListOfFilesAppFileRouter,
+)
 from marimo._server.lsp import CompositeLspServer, NoopLspServer
 from marimo._server.main import create_starlette_app
 from marimo._server.registry import LIFESPAN_REGISTRY
@@ -219,6 +222,18 @@ def start(
 
     if watch and config_reader.is_auto_save_enabled:
         LOGGER.warning("Enabling watch mode may interfere with auto-save.")
+
+    if (
+        mode == SessionMode.RUN
+        and watch
+        and isinstance(file_router, LazyListOfFilesAppFileRouter)
+    ):
+        LOGGER.warning(
+            "Using `marimo run <folder> --watch`: gallery files are "
+            "discovered dynamically. New notebooks created in this directory "
+            "may appear in the gallery and execute code when opened. Use "
+            "trusted directories and authentication controls."
+        )
 
     if GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA:
         config_reader = config_reader.with_overrides(

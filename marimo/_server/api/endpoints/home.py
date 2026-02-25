@@ -102,6 +102,12 @@ async def workspace_files(
         )
         from marimo._server.models.files import FileInfo
 
+        if session_manager.watch and isinstance(
+            session_manager.file_router, LazyListOfFilesAppFileRouter
+        ):
+            # In watched folder mode, refresh the index to include new/removed files since the previous request.
+            session_manager.file_router.mark_stale()
+
         base_url = app_state.base_url
         mode = session_manager.mode.value
 

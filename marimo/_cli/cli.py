@@ -37,7 +37,11 @@ from marimo._cli.utils import (
 )
 from marimo._config.settings import GLOBAL_SETTINGS
 from marimo._lint import run_check
-from marimo._server.file_router import AppFileRouter, flatten_files
+from marimo._server.file_router import (
+    AppFileRouter,
+    LazyListOfFilesAppFileRouter,
+    flatten_files,
+)
 from marimo._server.files.directory_scanner import DirectoryScanner
 from marimo._server.models.home import MarimoFile
 from marimo._server.start import start
@@ -862,6 +866,38 @@ def _collect_marimo_files(paths: list[str]) -> _CollectedRunFiles:
     return _CollectedRunFiles(files=files, root_dir=root_dir)
 
 
+def _create_run_file_router(
+    validated_paths: list[str], *, watch: bool
+) -> AppFileRouter:
+    """Create the file router for `marimo run`.
+
+    For `--watch` with a single directory, use a lazy directory router so the
+    gallery index can reflect file additions/deletions on subsequent requests.
+    For all other invocation shapes, preserve static snapshot behavior.
+    """
+    if (
+        watch
+        and len(validated_paths) == 1
+        and Path(validated_paths[0]).is_dir()
+    ):
+        return LazyListOfFilesAppFileRouter(
+            validated_paths[0], include_markdown=True
+        )
+
+    has_directory = any(Path(path).is_dir() for path in validated_paths)
+    is_multi = has_directory or len(validated_paths) > 1
+    if is_multi:
+        marimo_files = _collect_marimo_files(validated_paths)
+        return AppFileRouter.from_files(
+            marimo_files.files,
+            directory=marimo_files.root_dir,
+            allow_single_file_key=False,
+            allow_dynamic=False,
+        )
+
+    return AppFileRouter.from_filename(MarimoPath(validated_paths[0]))
+
+
 @main.command(
     help="""Run a notebook as an app in read-only mode.
 
@@ -1125,18 +1161,7 @@ def run(
                 "Or: pip install pyzmq"
             )
 
-    if is_multi:
-        marimo_files = _collect_marimo_files(validated_paths)
-        file_router = AppFileRouter.from_files(
-            marimo_files.files,
-            directory=marimo_files.root_dir,
-            allow_single_file_key=False,
-            allow_dynamic=False,
-        )
-    else:
-        file_router = AppFileRouter.from_filename(
-            MarimoPath(validated_paths[0])
-        )
+    file_router = _create_run_file_router(validated_paths, watch=watch)
 
     start(
         file_router=file_router,
