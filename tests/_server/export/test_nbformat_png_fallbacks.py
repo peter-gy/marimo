@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import nbformat
 import pytest
 
 from marimo._server.export._nbformat_png_fallbacks import (
     inject_png_fallbacks_into_notebook,
 )
 
-pytest.importorskip("nbformat")
+nbformat = pytest.importorskip("nbformat")
 
 
 def test_inject_png_fallbacks_replaces_rasterized_mimetypes() -> None:
