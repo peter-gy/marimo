@@ -25,8 +25,12 @@ import pytest
 
 from marimo._ast import codegen
 from marimo._ast.cell import CellConfig
-from marimo._cli.cli import _collect_marimo_files
+from marimo._cli.cli import _collect_marimo_files, _create_run_file_router
 from marimo._dependencies.dependencies import DependencyManager
+from marimo._server.file_router import (
+    LazyListOfFilesAppFileRouter,
+    ListOfFilesAppFileRouter,
+)
 from marimo._server.templates.templates import get_version
 from marimo._utils.platform import is_windows
 from marimo._utils.toml import read_toml
@@ -874,6 +878,48 @@ def test_collect_marimo_files_excludes_marimo_generated_markdown(
     assert str(py_file) in paths
     assert str(md_file) in paths
     assert str(generated_md) not in paths
+
+
+def test_create_run_file_router_watch_single_directory_is_lazy(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "one.py").write_text(
+        "import marimo\napp = marimo.App()\n", encoding="utf-8"
+    )
+
+    router = _create_run_file_router([str(tmp_path)], watch=True)
+    assert isinstance(router, LazyListOfFilesAppFileRouter)
+    assert router.include_markdown is True
+
+
+def test_create_run_file_router_no_watch_single_directory_is_static(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "one.py").write_text(
+        "import marimo\napp = marimo.App()\n", encoding="utf-8"
+    )
+
+    router = _create_run_file_router([str(tmp_path)], watch=False)
+    assert isinstance(router, ListOfFilesAppFileRouter)
+
+
+def test_create_run_file_router_watch_mixed_paths_is_static(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "gallery"
+    directory.mkdir()
+    (directory / "one.py").write_text(
+        "import marimo\napp = marimo.App()\n", encoding="utf-8"
+    )
+    standalone = tmp_path / "standalone.py"
+    standalone.write_text(
+        "import marimo\napp = marimo.App()\n", encoding="utf-8"
+    )
+
+    router = _create_run_file_router(
+        [str(directory), str(standalone)], watch=True
+    )
+    assert isinstance(router, ListOfFilesAppFileRouter)
 
 
 def test_cli_run_with_show_code(temp_marimo_file: str) -> None:
