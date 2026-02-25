@@ -82,13 +82,11 @@ class HtmlAssetServer(AbstractContextManager["HtmlAssetServer"]):
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
+        _exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: TracebackType | None,
     ) -> None:
-        del exc_type
-        del exc
-        del tb
+        # Cleanup only. We intentionally do not suppress exceptions raised inside the with-block.
 
         if self._server is not None:
             self._server.shutdown()

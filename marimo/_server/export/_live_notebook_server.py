@@ -18,7 +18,7 @@ LOGGER = _loggers.marimo_logger()
 _LIVE_SERVER_START_TIMEOUT_S = 90.0
 _LIVE_SERVER_POLL_INTERVAL_S = 0.2
 _LIVE_SERVER_SHUTDOWN_TIMEOUT_S = 5.0
-_LIVE_SERVER_DEFAULT_PORT = 2718
+_LIVE_SERVER_DEFAULT_PORT = 2719
 
 
 class LiveNotebookServer(AbstractContextManager["LiveNotebookServer"]):
@@ -61,15 +61,13 @@ class LiveNotebookServer(AbstractContextManager["LiveNotebookServer"]):
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: object,
+        _exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: object,
     ) -> None:
         """Terminate the server and clean up temporary log resources."""
-
-        del exc_type
-        del exc
-        del tb
+        # Cleanup only. We intentionally do not suppress exceptions raised
+        # inside the with-block.
 
         if self._process is not None:
             self._terminate_process(self._process)

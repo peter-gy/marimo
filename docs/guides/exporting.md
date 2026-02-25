@@ -152,8 +152,8 @@ Rasterization runs only when outputs are included (the default `--include-output
     Rasterized output capture requires Playwright and Chromium:
 
     ```bash
-    python -m pip install playwright
-    python -m playwright install chromium
+    uv pip install playwright
+    playwright install chromium
     ```
 
 If you export to a Jupyter notebook, you can leverage various Jupyter ecosystem tools. For PDFs, you will
