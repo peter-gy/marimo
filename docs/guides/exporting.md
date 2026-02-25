@@ -137,8 +137,8 @@ You can export directly with marimo:
 # Hide code cells in the exported PDF
 marimo export pdf notebook.py -o notebook.pdf --no-include-inputs
 
-# Rasterize interactive widget/Vega outputs before PDF conversion
-marimo export pdf notebook.py -o notebook.pdf --rasterize-outputs --no-include-inputs
+# Include interactive cell outputs as rasterized images
+marimo export pdf notebook.py -o notebook.pdf --no-include-inputs --rasterize-outputs
 ```
 
 The `--no-include-inputs` flag hides Python code cells while keeping markdown and cell outputs in the generated PDF.
