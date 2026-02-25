@@ -134,10 +134,27 @@ enables exporting to PDF and other formats with Pandoc. See this [publishing](./
 You can export directly with marimo:
 
 ```bash
+# Hide code cells in the exported PDF
 marimo export pdf notebook.py -o notebook.pdf --no-include-inputs
+
+# Rasterize interactive widget/Vega outputs before PDF conversion
+marimo export pdf notebook.py -o notebook.pdf --rasterize-outputs --no-include-inputs
 ```
 
 The `--no-include-inputs` flag hides Python code cells while keeping markdown and cell outputs in the generated PDF.
+
+Use `--rasterize-outputs` to capture PNG fallbacks for marimo widget HTML (including anywidgets) and Vega outputs before `nbconvert` PDF conversion. Rasterization works with both `--webpdf` and `--no-webpdf`.
+
+Rasterization runs only when outputs are included (the default `--include-outputs` mode). Use `--raster-scale` (range `1.0` to `4.0`, default `4.0`) to trade export speed/file size for sharper captured output.
+
+!!! note "Rasterization dependencies"
+
+    Rasterized output capture requires Playwright and Chromium:
+
+    ```bash
+    python -m pip install playwright
+    python -m playwright install chromium
+    ```
 
 If you export to a Jupyter notebook, you can leverage various Jupyter ecosystem tools. For PDFs, you will
 need to have [Pandoc](https://nbconvert.readthedocs.io/en/latest/install.html#installing-pandoc) and [TeX](https://nbconvert.readthedocs.io/en/latest/install.html#installing-tex) installed. The examples below use `uvx`, which you can obtain by [installing `uv`](https://docs.astral.sh/uv/getting-started/installation/).
