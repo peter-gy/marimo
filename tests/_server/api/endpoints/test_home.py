@@ -207,6 +207,54 @@ def test_workspace_files_run_mode_allowlist(client: TestClient) -> None:
 
 
 @with_session(SESSION_ID)
+def test_workspace_files_run_mode_allowlist_skips_deleted_file(
+    client: TestClient,
+) -> None:
+    session_manager = get_session_manager(client)
+    session_manager.mode = SessionMode.RUN
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_one = Path(temp_dir) / "one.py"
+        file_one.write_text("import marimo\napp = marimo.App()")
+        file_two = Path(temp_dir) / "two.py"
+        file_two.write_text("import marimo\napp = marimo.App()")
+
+        marimo_files = [
+            MarimoFile(
+                name=file_one.name,
+                path=str(file_one),
+                last_modified=file_one.stat().st_mtime,
+            ),
+            MarimoFile(
+                name=file_two.name,
+                path=str(file_two),
+                last_modified=file_two.stat().st_mtime,
+            ),
+        ]
+        session_manager.file_router = AppFileRouter.from_files(
+            marimo_files,
+            directory=temp_dir,
+            allow_single_file_key=False,
+        )
+
+        file_two.unlink()
+
+        response = client.post(
+            "/api/home/workspace_files",
+            headers=HEADERS,
+            json={"include_markdown": False},
+        )
+        body = response.json()
+        files = body["files"]
+
+        assert response.status_code == 200
+        assert body["root"] == temp_dir
+        assert body["fileCount"] == 1
+        assert body["hasMore"] is False
+        assert [file["path"] for file in files] == [str(file_one)]
+
+
+@with_session(SESSION_ID)
 def test_thumbnail_redirects_for_https_opengraph_image(
     client: TestClient,
 ) -> None:

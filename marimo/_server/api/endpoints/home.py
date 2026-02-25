@@ -32,6 +32,7 @@ from marimo._server.models.home import (
 from marimo._server.router import APIRouter
 from marimo._session.model import ConnectionState, SessionMode
 from marimo._tutorials import create_temp_tutorial_file  # type: ignore
+from marimo._utils.http import HTTPException, HTTPStatus
 from marimo._utils.paths import pretty_path
 
 if TYPE_CHECKING:
@@ -111,9 +112,16 @@ async def workspace_files(
             ]
             result: list[FileInfo] = []
             for file in marimo_files:
-                resolved_path = session_manager.file_router.resolve_file_path(
-                    file.path
-                )
+                try:
+                    resolved_path = (
+                        session_manager.file_router.resolve_file_path(
+                            file.path
+                        )
+                    )
+                except HTTPException as e:
+                    if e.status_code == HTTPStatus.NOT_FOUND:
+                        continue
+                    raise
                 opengraph = None
                 if resolved_path is not None:
                     # User-defined OpenGraph generators receive this context for dynamic metadata
