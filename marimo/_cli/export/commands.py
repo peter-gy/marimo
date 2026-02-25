@@ -597,7 +597,9 @@ Requires nbformat and nbconvert to be installed.
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
 )
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
+@click.pass_context
 def pdf(
+    ctx: click.Context,
     name: str,
     output: Path,
     watch: bool,
@@ -612,6 +614,17 @@ def pdf(
 ) -> None:
     """Run a notebook and export it as a PDF file."""
     import sys
+
+    if not include_outputs:
+        rasterize_source = ctx.get_parameter_source("rasterize_outputs")
+        raster_scale_source = ctx.get_parameter_source("raster_scale")
+        if (
+            rasterize_source is not click.core.ParameterSource.DEFAULT
+            or raster_scale_source is not click.core.ParameterSource.DEFAULT
+        ):
+            raise click.ClickException(
+                "Rasterization options require --include-outputs."
+            )
 
     if include_outputs:
         # Set default, if not provided

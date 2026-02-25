@@ -864,6 +864,43 @@ class TestExportPDF:
         assert "nbconvert" in stderr
         assert "pip install" in stderr
 
+    @staticmethod
+    def test_export_pdf_rasterize_requires_outputs(
+        temp_marimo_file: str,
+    ) -> None:
+        output_file = temp_marimo_file.replace(".py", ".pdf")
+        p = _run_export(
+            "pdf",
+            temp_marimo_file,
+            "--output",
+            output_file,
+            "--no-include-outputs",
+            "--rasterize-outputs",
+            "--no-sandbox",
+        )
+        _assert_failure(p)
+        stderr = p.stderr.decode()
+        assert "Rasterization options require --include-outputs." in stderr
+
+    @staticmethod
+    def test_export_pdf_raster_scale_requires_outputs(
+        temp_marimo_file: str,
+    ) -> None:
+        output_file = temp_marimo_file.replace(".py", ".pdf")
+        p = _run_export(
+            "pdf",
+            temp_marimo_file,
+            "--output",
+            output_file,
+            "--no-include-outputs",
+            "--raster-scale",
+            "2",
+            "--no-sandbox",
+        )
+        _assert_failure(p)
+        stderr = p.stderr.decode()
+        assert "Rasterization options require --include-outputs." in stderr
+
 
 @pytest.mark.skipif(
     not DependencyManager.playwright.has(),
