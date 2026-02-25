@@ -852,6 +852,30 @@ def test_collect_marimo_files_includes_markdown(
     assert str(md_file) in {file.path for file in collected.files}
 
 
+def test_collect_marimo_files_excludes_marimo_generated_markdown(
+    tmp_path: Path,
+) -> None:
+    py_file = tmp_path / "notebook.py"
+    py_file.write_text("import marimo\napp = marimo.App()\n", encoding="utf-8")
+
+    md_file = tmp_path / "notes.md"
+    md_file.write_text("---\nmarimo-version: 0.1.0\n---\n", encoding="utf-8")
+
+    marimo_dir = tmp_path / "__marimo__"
+    marimo_dir.mkdir()
+    generated_md = marimo_dir / "notebook.md"
+    generated_md.write_text(
+        "---\nmarimo-version: 0.1.0\n---\n", encoding="utf-8"
+    )
+
+    collected = _collect_marimo_files([str(tmp_path)])
+    paths = {file.path for file in collected.files}
+
+    assert str(py_file) in paths
+    assert str(md_file) in paths
+    assert str(generated_md) not in paths
+
+
 def test_cli_run_with_show_code(temp_marimo_file: str) -> None:
     port = _get_port()
     p = subprocess.Popen(

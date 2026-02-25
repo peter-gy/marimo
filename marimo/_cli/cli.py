@@ -841,6 +841,8 @@ def _collect_marimo_files(paths: list[str]) -> _CollectedRunFiles:
             for file_info in flatten_files(file_infos):
                 if not file_info.is_marimo_file:
                     continue
+                if "__marimo__" in Path(file_info.path).parts:
+                    continue
                 absolute_path = str(directory / file_info.path)
                 files_by_path[absolute_path] = MarimoFile(
                     name=file_info.name,
