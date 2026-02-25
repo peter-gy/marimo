@@ -5,7 +5,7 @@ import threading
 from contextlib import AbstractContextManager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -61,7 +61,7 @@ class HtmlAssetServer(AbstractContextManager["HtmlAssetServer"]):
             raise RuntimeError("HTML asset server is not running")
         self._server.dynamic_html = html
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> HtmlAssetServer:
         if not self._directory.is_dir():
             raise RuntimeError(f"Static assets not found at {self._directory}")
 

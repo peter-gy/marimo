@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Self
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 from marimo._ast.app import App, InternalApp
@@ -110,7 +110,7 @@ def test_collect_pdf_png_fallbacks_static_and_live_without_mutation() -> None:
         base_url = "http://127.0.0.1:1234"
         page_url = "http://127.0.0.1:1234/__marimo_pdf_raster__.html"
 
-        def __enter__(self) -> Self:
+        def __enter__(self) -> _FakeServer:
             return self
 
         def __exit__(self, *args: object) -> None:

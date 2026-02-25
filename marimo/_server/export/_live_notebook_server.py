@@ -7,7 +7,6 @@ import tempfile
 import time
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Self
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -43,7 +42,7 @@ class LiveNotebookServer(AbstractContextManager["LiveNotebookServer"]):
     def health_url(self) -> str:
         return f"{self.page_url}/health"
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> LiveNotebookServer:
         """Start the server process and block until the health endpoint is ready."""
 
         self._log_file = tempfile.NamedTemporaryFile(
