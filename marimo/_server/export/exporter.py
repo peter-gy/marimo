@@ -6,7 +6,7 @@ import base64
 import mimetypes
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Literal, Optional, cast
+from typing import TYPE_CHECKING, Literal, Optional, cast
 
 from marimo import _loggers
 from marimo._ast.app import InternalApp
@@ -42,12 +42,16 @@ from marimo._session.state.serialize import (
     serialize_session_view,
 )
 from marimo._session.state.session_view import SessionView
+from marimo._types.ids import CellId_t
 from marimo._utils import async_path
 from marimo._utils.code import hash_code
 from marimo._utils.data_uri import build_data_url
 from marimo._utils.marimo_path import MarimoPath
 from marimo._utils.paths import marimo_package_path
 from marimo._version import __version__
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 LOGGER = _loggers.marimo_logger()
 
@@ -314,6 +318,7 @@ class Exporter:
         *,
         app: InternalApp,
         session_view: SessionView | None,
+        png_fallbacks: Mapping[CellId_t, str] | None = None,
         webpdf: bool,
         include_inputs: bool = True,
     ) -> bytes | None:
@@ -322,6 +327,8 @@ class Exporter:
         Args:
             app: The app to export
             session_view: The session view to export. If None, outputs are not included.
+            png_fallbacks: Optional cell-id keyed image/png fallbacks to
+                inject into notebook outputs before nbconvert.
             include_inputs: Whether to include code cell inputs in the export.
             webpdf: If False, tries standard PDF export (pandoc + TeX) first,
                 falling back to webpdf on failure. If True, uses webpdf
@@ -348,6 +355,15 @@ class Exporter:
         import nbformat
 
         notebook = nbformat.reads(ipynb_json_str, as_version=4)  # type: ignore[no-untyped-call]
+        if png_fallbacks:
+            from marimo._server.export._nbformat_png_fallbacks import (
+                inject_png_fallbacks_into_notebook,
+            )
+
+            inject_png_fallbacks_into_notebook(
+                notebook,
+                png_fallbacks=png_fallbacks,
+            )
 
         # Try standard PDF export first (requires pandoc + TeX)
         # and fall back to webpdf if it fails

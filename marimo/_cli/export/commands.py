@@ -550,6 +550,21 @@ Requires nbformat and nbconvert to be installed.
     ),
 )
 @click.option(
+    "--rasterize-outputs/--no-rasterize-outputs",
+    default=False,
+    type=bool,
+    help=(
+        "Rasterize marimo widget HTML and Vega outputs to PNG fallbacks before PDF "
+        "conversion."
+    ),
+)
+@click.option(
+    "--raster-scale",
+    type=click.FloatRange(min=1.0, max=4.0),
+    default=4.0,
+    help="Scale factor for rasterized output screenshots.",
+)
+@click.option(
     "--watch/--no-watch",
     default=False,
     type=bool,
@@ -589,6 +604,8 @@ def pdf(
     include_outputs: bool,
     include_inputs: bool,
     webpdf: bool,
+    rasterize_outputs: bool,
+    raster_scale: float,
     sandbox: Optional[bool],
     force: bool,
     args: tuple[str],
@@ -635,6 +652,24 @@ def pdf(
         ) from None
 
     cli_args = parse_args(args) if include_outputs else {}
+    rasterization_enabled = include_outputs and rasterize_outputs
+    if rasterization_enabled and not DependencyManager.playwright.has():
+        # TODO(peter-gy): migrate this once https://github.com/marimo-team/marimo/pull/8375 get merged
+        raise click.ClickException(
+            "Playwright is required to rasterize HTML outputs for PDF "
+            "export.\n\n"
+            f"  {green('Tip:')} Install with:\n\n"
+            "    python -m pip install playwright\n\n"
+            "  and install Chromium with:\n\n"
+            "    python -m playwright install chromium"
+        )
+
+    from marimo._server.export._pdf_raster import PDFRasterizationOptions
+
+    rasterization_options = PDFRasterizationOptions(
+        enabled=rasterization_enabled,
+        scale=raster_scale,
+    )
 
     def export_callback(
         file_path: MarimoPath,
@@ -648,6 +683,7 @@ def pdf(
                     webpdf=webpdf,
                     cli_args=cli_args,
                     argv=list(args) if include_outputs else None,
+                    rasterization_options=rasterization_options,
                 )
             )
         except ModuleNotFoundError as e:
