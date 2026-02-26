@@ -551,11 +551,11 @@ Requires nbformat and nbconvert to be installed.
 )
 @click.option(
     "--rasterize-outputs/--no-rasterize-outputs",
-    default=False,
+    default=True,
     type=bool,
     help=(
         "Rasterize marimo widget HTML and Vega outputs to PNG fallbacks before PDF "
-        "conversion."
+        "conversion (enabled by default)."
     ),
 )
 @click.option(

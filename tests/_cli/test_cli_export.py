@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 import click
 import pytest
 
+from marimo._cli.export.commands import pdf
 from marimo._dependencies.dependencies import DependencyManager
 from marimo._utils import async_path
 from marimo._utils.platform import is_windows
@@ -843,6 +844,14 @@ class TestExportIpynb:
 
 
 class TestExportPDF:
+    @staticmethod
+    def test_export_pdf_rasterize_outputs_default_enabled() -> None:
+        rasterize_option = next(
+            param for param in pdf.params if param.name == "rasterize_outputs"
+        )
+        assert isinstance(rasterize_option, click.Option)
+        assert rasterize_option.default is True
+
     @pytest.mark.skipif(
         DependencyManager.nbformat.has() and DependencyManager.nbconvert.has(),
         reason="This test expects PDF export deps to be missing.",
