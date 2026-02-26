@@ -463,21 +463,40 @@ async def export_as_pdf(*, request: Request) -> Response:
             detail="File must have a name before exporting",
         )
 
-    # Detect slides layout and use dedicated async slides exporter
-    layout_config = session.app_file_manager.read_layout_config()
-    is_slides = layout_config is not None and layout_config.type == "slides"
+    from marimo._server.export._pdf_raster import (
+        PDFRasterizationOptions,
+        collect_pdf_png_fallbacks,
+    )
+
+    raster_options = PDFRasterizationOptions(
+        enabled=body.rasterize_outputs,
+        scale=body.raster_scale,
+        server_mode=body.raster_server,
+    )
+
+    png_fallbacks = await collect_pdf_png_fallbacks(
+        app=session.app_file_manager.app,
+        session_view=session.session_view,
+        filename=session.app_file_manager.filename,
+        filepath=session.app_file_manager.path,
+        options=raster_options,
+    )
 
     exporter = Exporter()
-    if is_slides:
+    if body.preset == "slides":
         pdf_data = await exporter.export_as_slides_pdf(
             app=session.app_file_manager.app,
             session_view=session.session_view,
+            png_fallbacks=png_fallbacks,
+            include_inputs=body.include_inputs,
         )
     else:
         pdf_data = exporter.export_as_pdf(
             app=session.app_file_manager.app,
             session_view=session.session_view,
+            png_fallbacks=png_fallbacks,
             webpdf=body.webpdf,
+            include_inputs=body.include_inputs,
         )
     if pdf_data is None:
         raise HTTPException(
