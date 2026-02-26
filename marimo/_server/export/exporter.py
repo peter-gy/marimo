@@ -6,7 +6,7 @@ import base64
 import mimetypes
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 
 from marimo import _loggers
 from marimo._ast.app import InternalApp
@@ -403,6 +403,7 @@ class Exporter:
         *,
         app: InternalApp,
         session_view: SessionView | None,
+        png_fallbacks: Mapping[CellId_t, str] | None = None,
         include_inputs: bool = True,
     ) -> bytes | None:
         """Export a slides notebook as PDF using reveal.js + Playwright.
@@ -418,6 +419,8 @@ class Exporter:
             app: The app to export
             session_view: The session view to export. If None, outputs
                 are not included.
+            png_fallbacks: Optional cell-id keyed image/png fallbacks to
+                inject into notebook outputs before conversion.
             include_inputs: Whether to include code cell inputs.
 
         Returns:
@@ -437,8 +440,35 @@ class Exporter:
         import nbformat
 
         notebook = nbformat.reads(ipynb_json_str, as_version=4)  # type: ignore[no-untyped-call]
+        if png_fallbacks:
+            from marimo._server.export._nbformat_png_fallbacks import (
+                inject_png_fallbacks_into_notebook,
+            )
 
+            inject_png_fallbacks_into_notebook(
+                notebook,
+                png_fallbacks=png_fallbacks,
+            )
         return await self._export_slides_as_pdf(notebook, include_inputs)
+
+    @staticmethod
+    def _to_file_uri(path: str) -> str:
+        import os
+        from urllib.request import pathname2url
+
+        return f"file://{pathname2url(os.path.abspath(path))}"
+
+    @staticmethod
+    def _slide_type_for_cell(cell: Any, include_inputs: bool) -> str:
+        if include_inputs:
+            return "slide"
+        cell_type = str(cell.get("cell_type", ""))
+        if cell_type != "code":
+            return "slide"
+        outputs = cell.get("outputs", [])
+        if isinstance(outputs, list) and outputs:
+            return "slide"
+        return "skip"
 
     @staticmethod
     async def _export_slides_as_pdf(
@@ -451,11 +481,13 @@ class Exporter:
 
         from nbconvert import SlidesExporter  # type: ignore[import-not-found]
 
-        # Add slideshow metadata so each cell becomes a slide
+        # Add slideshow metadata so each cell becomes a slide.
         for cell in notebook.cells:
             if "slideshow" not in cell.metadata:
                 cell.metadata["slideshow"] = {}
-            cell.metadata["slideshow"]["slide_type"] = "slide"
+            cell.metadata["slideshow"]["slide_type"] = (
+                Exporter._slide_type_for_cell(cell, include_inputs)
+            )
 
         # Convert to reveal.js HTML
         slides_exporter = SlidesExporter()
@@ -474,24 +506,54 @@ class Exporter:
                 async_playwright,
             )
 
-            async with async_playwright() as p:
-                browser = await p.chromium.launch()
-                page = await browser.new_page()
-                # ?print-pdf tells reveal.js to use a linear print layout
-                await page.goto(f"file://{temp_path}?print-pdf")
-                await page.wait_for_load_state("networkidle")
-                pdf_data = await page.pdf(
-                    print_background=True,
-                    prefer_css_page_size=True,
-                )
-                await browser.close()
-
-            if not isinstance(pdf_data, bytes):
-                LOGGER.error("Slides PDF data is not bytes: %s", pdf_data)
-                return None
-            return pdf_data
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.launch()
+                try:
+                    page = await browser.new_page()
+                    # ?print-pdf tells reveal.js to use a linear print layout
+                    temp_uri = Exporter._to_file_uri(temp_path)
+                    await page.goto(
+                        f"{temp_uri}?print-pdf",
+                        wait_until="networkidle",
+                    )
+                    await page.evaluate(
+                        """
+                        () => {
+                          const reveal = window.Reveal;
+                          if (
+                            reveal &&
+                            typeof reveal.layout === "function"
+                          ) {
+                            reveal.layout();
+                          }
+                        }
+                        """
+                    )
+                    await page.wait_for_timeout(300)
+                    await page.add_style_tag(
+                        content=(
+                            ".pdf-page:last-of-type {"
+                            " page-break-after: auto !important;"
+                            " break-after: auto !important;"
+                            "}"
+                        )
+                    )
+                    pdf_data = await page.pdf(
+                        print_background=True,
+                        prefer_css_page_size=True,
+                    )
+                finally:
+                    await browser.close()
         finally:
-            os.unlink(temp_path)
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                LOGGER.debug("Failed to remove temp slide HTML: %s", temp_path)
+
+        if not isinstance(pdf_data, bytes):
+            LOGGER.error("Slides PDF data is not bytes: %s", pdf_data)
+            return None
+        return pdf_data
 
     def export_assets(
         self, directory: Path, ignore_index_html: bool = False

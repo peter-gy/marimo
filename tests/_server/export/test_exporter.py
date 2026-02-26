@@ -6,7 +6,7 @@ import json
 import pathlib
 import sys
 from typing import TYPE_CHECKING, Any
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -1149,9 +1149,6 @@ class TestPDFExport:
         session_view: SessionView,
     ) -> None:
         """Test slides PDF export uses SlidesExporter + async Playwright."""
-        import sys
-        from unittest.mock import AsyncMock
-
         app = App()
 
         @app.cell()
@@ -1165,7 +1162,6 @@ class TestPDFExport:
         file_manager = AppFileManager.from_app(InternalApp(app))
         exporter = Exporter()
 
-        # Mock SlidesExporter
         mock_slides_exporter_instance = MagicMock()
         mock_slides_exporter_instance.from_notebook_node.return_value = (
             "<html>mock slides html</html>",
@@ -1175,7 +1171,6 @@ class TestPDFExport:
             return_value=mock_slides_exporter_instance
         )
 
-        # Mock async Playwright
         mock_page = AsyncMock()
         mock_page.pdf.return_value = b"mock_slides_pdf_data"
         mock_browser = AsyncMock()
@@ -1187,13 +1182,11 @@ class TestPDFExport:
         mock_playwright_cm.__aexit__.return_value = False
         mock_async_playwright = MagicMock(return_value=mock_playwright_cm)
 
-        # Create mock modules for nbconvert and playwright
         mock_nbconvert = MagicMock()
         mock_nbconvert.SlidesExporter = mock_slides_exporter_cls
         mock_playwright_async = MagicMock()
         mock_playwright_async.async_playwright = mock_async_playwright
 
-        # Save original modules
         orig_nbconvert = sys.modules.get("nbconvert")
         orig_playwright = sys.modules.get("playwright.async_api")
 
@@ -1214,35 +1207,33 @@ class TestPDFExport:
                     session_view=session_view,
                 )
 
-                assert result == b"mock_slides_pdf_data"
-                # SlidesExporter was used
-                mock_slides_exporter_cls.assert_called_once()
-                mock_slides_exporter_instance.from_notebook_node.assert_called_once()
+            assert result == b"mock_slides_pdf_data"
+            mock_slides_exporter_cls.assert_called_once()
+            mock_slides_exporter_instance.from_notebook_node.assert_called_once()
+            notebook = (
+                mock_slides_exporter_instance.from_notebook_node.call_args[0][
+                    0
+                ]
+            )
+            slide_types = [
+                cell.metadata.get("slideshow", {}).get("slide_type")
+                for cell in notebook.cells
+            ]
+            assert slide_types
+            assert set(slide_types) == {"slide"}
 
-                # Verify slideshow metadata was added to cells
-                notebook = (
-                    mock_slides_exporter_instance.from_notebook_node.call_args[
-                        0
-                    ][0]
-                )
-                for cell in notebook.cells:
-                    assert (
-                        cell.metadata.get("slideshow", {}).get("slide_type")
-                        == "slide"
-                    )
-
-                # Verify Playwright was used with ?print-pdf
-                mock_page.goto.assert_called_once()
-                goto_url = mock_page.goto.call_args[0][0]
-                assert "?print-pdf" in goto_url
-
-                # Verify PDF options
-                mock_page.pdf.assert_called_once_with(
-                    print_background=True,
-                    prefer_css_page_size=True,
-                )
+            mock_page.goto.assert_called_once()
+            goto_url = mock_page.goto.call_args[0][0]
+            assert goto_url.startswith("file://")
+            assert "?print-pdf" in goto_url
+            assert mock_page.evaluate.await_count >= 1
+            mock_page.wait_for_timeout.assert_called_once_with(300)
+            mock_page.add_style_tag.assert_called_once()
+            mock_page.pdf.assert_called_once_with(
+                print_background=True,
+                prefer_css_page_size=True,
+            )
         finally:
-            # Restore original modules
             if orig_nbconvert is not None:
                 sys.modules["nbconvert"] = orig_nbconvert
             else:
@@ -1256,37 +1247,56 @@ class TestPDFExport:
         not DependencyManager.nbformat.has(),
         reason="nbformat not installed",
     )
-    def test_export_as_pdf_non_slides_uses_standard_path(
+    async def test_export_as_slides_pdf_marks_all_slides_without_inputs(
         self,
         session_view: SessionView,
     ) -> None:
-        """Test that non-slides layout uses standard PDF export, not SlidesExporter."""
-        import sys
-
         app = App()
 
         @app.cell()
-        def test_cell():
-            return "test"
+        def slide_1():
+            value = 1
+            return value
+
+        @app.cell()
+        def slide_2():
+            value = 2
+            return value
 
         file_manager = AppFileManager.from_app(InternalApp(app))
         exporter = Exporter()
 
-        mock_exporter_instance = MagicMock()
-        mock_exporter_instance.from_notebook_node.return_value = (
-            b"mock_webpdf_data",
+        mock_slides_exporter_instance = MagicMock()
+        mock_slides_exporter_instance.from_notebook_node.return_value = (
+            "<html>mock slides html</html>",
             {},
         )
-        mock_webpdf_cls = MagicMock(return_value=mock_exporter_instance)
+        mock_slides_exporter_cls = MagicMock(
+            return_value=mock_slides_exporter_instance
+        )
 
-        # Create mock nbconvert module
+        mock_page = AsyncMock()
+        mock_page.pdf.return_value = b"mock_slides_pdf_data"
+        mock_browser = AsyncMock()
+        mock_browser.new_page.return_value = mock_page
+        mock_playwright_instance = AsyncMock()
+        mock_playwright_instance.chromium.launch.return_value = mock_browser
+        mock_playwright_cm = AsyncMock()
+        mock_playwright_cm.__aenter__.return_value = mock_playwright_instance
+        mock_playwright_cm.__aexit__.return_value = False
+        mock_async_playwright = MagicMock(return_value=mock_playwright_cm)
+
         mock_nbconvert = MagicMock()
-        mock_nbconvert.WebPDFExporter = mock_webpdf_cls
+        mock_nbconvert.SlidesExporter = mock_slides_exporter_cls
+        mock_playwright_async = MagicMock()
+        mock_playwright_async.async_playwright = mock_async_playwright
 
         orig_nbconvert = sys.modules.get("nbconvert")
+        orig_playwright = sys.modules.get("playwright.async_api")
 
         try:
             sys.modules["nbconvert"] = mock_nbconvert
+            sys.modules["playwright.async_api"] = mock_playwright_async
 
             with (
                 patch.object(
@@ -1296,18 +1306,33 @@ class TestPDFExport:
                     DependencyManager.playwright, "has", return_value=True
                 ),
             ):
-                result = exporter.export_as_pdf(
+                result = await exporter.export_as_slides_pdf(
                     app=file_manager.app,
                     session_view=session_view,
-                    webpdf=True,
+                    include_inputs=False,
                 )
 
-                assert result == b"mock_webpdf_data"
-                # WebPDFExporter was used, not SlidesExporter
-                mock_webpdf_cls.assert_called_once()
-                mock_nbconvert.SlidesExporter.assert_not_called()
+            assert result == b"mock_slides_pdf_data"
+            notebook = (
+                mock_slides_exporter_instance.from_notebook_node.call_args[0][
+                    0
+                ]
+            )
+            slide_types = [
+                cell.metadata.get("slideshow", {}).get("slide_type")
+                for cell in notebook.cells
+            ]
+            assert set(slide_types) == {"skip"}
+            mock_page.pdf.assert_called_once_with(
+                print_background=True,
+                prefer_css_page_size=True,
+            )
         finally:
             if orig_nbconvert is not None:
                 sys.modules["nbconvert"] = orig_nbconvert
             else:
                 sys.modules.pop("nbconvert", None)
+            if orig_playwright is not None:
+                sys.modules["playwright.async_api"] = orig_playwright
+            else:
+                sys.modules.pop("playwright.async_api", None)
