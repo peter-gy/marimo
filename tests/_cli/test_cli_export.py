@@ -852,6 +852,14 @@ class TestExportPDF:
         assert isinstance(rasterize_option, click.Option)
         assert rasterize_option.default is True
 
+    @staticmethod
+    def test_export_pdf_raster_server_default_static() -> None:
+        raster_server_option = next(
+            param for param in pdf.params if param.name == "raster_server"
+        )
+        assert isinstance(raster_server_option, click.Option)
+        assert raster_server_option.default == "static"
+
     @pytest.mark.skipif(
         DependencyManager.nbformat.has() and DependencyManager.nbconvert.has(),
         reason="This test expects PDF export deps to be missing.",
@@ -904,6 +912,25 @@ class TestExportPDF:
             "--no-include-outputs",
             "--raster-scale",
             "2",
+            "--no-sandbox",
+        )
+        _assert_failure(p)
+        stderr = p.stderr.decode()
+        assert "Rasterization options require --include-outputs." in stderr
+
+    @staticmethod
+    def test_export_pdf_raster_server_requires_outputs(
+        temp_marimo_file: str,
+    ) -> None:
+        output_file = temp_marimo_file.replace(".py", ".pdf")
+        p = _run_export(
+            "pdf",
+            temp_marimo_file,
+            "--output",
+            output_file,
+            "--no-include-outputs",
+            "--raster-server",
+            "live",
             "--no-sandbox",
         )
         _assert_failure(p)

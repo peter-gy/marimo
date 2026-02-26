@@ -24,6 +24,8 @@ from marimo._types.ids import CellId_t
 from marimo._utils.paths import marimo_package_path
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from marimo._ast.app import InternalApp
     from marimo._session.state.session_view import SessionView
 
@@ -70,6 +72,7 @@ WAIT_FOR_NEXT_PAINT = r"""
 class PDFRasterizationOptions:
     enabled: bool = True
     scale: float = 4.0
+    server_mode: str = "static"
 
 
 CaptureExpectation = Literal["anywidget", "vega"]
@@ -79,7 +82,6 @@ CaptureExpectation = Literal["anywidget", "vega"]
 class _RasterTarget:
     cell_id: CellId_t
     expects: tuple[CaptureExpectation, ...]
-    requires_live_capture: bool
 
 
 def _contains_marker(content: Any, markers: tuple[str, ...]) -> bool:
@@ -95,7 +97,7 @@ def _contains_marker(content: Any, markers: tuple[str, ...]) -> bool:
     return isinstance(content, str) and _contains(content)
 
 
-def _dedupe_strings(values: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+def _dedupe_strings(values: Sequence[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
@@ -134,17 +136,10 @@ def _build_target_from_mimebundle(
 
     should_capture = False
     expects: list[CaptureExpectation] = []
-    requires_live_capture = False
 
     for mimetype, content in mimebundle.items():
         if _should_rasterize_output(mimetype, content):
             should_capture = True
-        if mimetype in {
-            TEXT_HTML,
-            TEXT_PLAIN,
-            TEXT_MARKDOWN,
-        } and _contains_marker(content, MARIMO_COMPONENT_MARKERS):
-            requires_live_capture = True
         if _contains_marker(content, ANYWIDGET_COMPONENT_MARKERS):
             expects.append("anywidget")
         if mimetype in VEGA_MIME_TYPES or _contains_marker(
@@ -158,7 +153,6 @@ def _build_target_from_mimebundle(
     return _RasterTarget(
         cell_id=cell_id,
         expects=cast(tuple[CaptureExpectation, ...], _dedupe_strings(expects)),
-        requires_live_capture=requires_live_capture,
     )
 
 
@@ -184,10 +178,6 @@ def _build_target_from_output(
     return _RasterTarget(
         cell_id=cell_id,
         expects=cast(tuple[CaptureExpectation, ...], _dedupe_strings(expects)),
-        requires_live_capture=(
-            mimetype in {TEXT_HTML, TEXT_PLAIN, TEXT_MARKDOWN}
-            and _contains_marker(data, MARIMO_COMPONENT_MARKERS)
-        ),
     )
 
 
@@ -436,47 +426,38 @@ async def collect_pdf_png_fallbacks(
         LOGGER.debug("Raster capture skipped: no eligible outputs found.")
         return {}
 
-    live_targets = _sort_targets_by_notebook_order(
-        session_view,
-        [
-            target
-            for target in targets
-            if "anywidget" in target.expects or target.requires_live_capture
-        ],
-    )
-    live_cell_ids = {target.cell_id for target in live_targets}
-    static_targets = [
-        target for target in targets if target.cell_id not in live_cell_ids
-    ]
+    targets = _sort_targets_by_notebook_order(session_view, targets)
+    server_mode = options.server_mode.lower()
+    if server_mode not in {"static", "live"}:
+        LOGGER.warning(
+            "Unknown raster server mode '%s'; defaulting to static.",
+            options.server_mode,
+        )
+        server_mode = "static"
 
     LOGGER.debug(
-        "Raster capture planning: total=%s static=%s live=%s",
+        "Raster capture planning: total=%s server_mode=%s",
         len(targets),
-        len(static_targets),
-        len(live_targets),
+        server_mode,
     )
 
-    captures: dict[CellId_t, str] = {}
-    if static_targets:
-        captures.update(
-            await _collect_static_captures(
-                app=app,
-                session_view=session_view,
-                filename=filename,
-                filepath=filepath,
-                options=options,
-                static_targets=static_targets,
-            )
+    if server_mode == "live":
+        LOGGER.debug("Raster capture strategy: live-only.")
+        captures = await _collect_live_captures(
+            filepath=filepath,
+            argv=argv,
+            options=options,
+            live_targets=targets,
         )
-
-    if live_targets:
-        captures.update(
-            await _collect_live_captures(
-                filepath=filepath,
-                argv=argv,
-                options=options,
-                live_targets=live_targets,
-            )
+    else:
+        LOGGER.debug("Raster capture strategy: static-only.")
+        captures = await _collect_static_captures(
+            app=app,
+            session_view=session_view,
+            filename=filename,
+            filepath=filepath,
+            options=options,
+            static_targets=targets,
         )
 
     LOGGER.debug(

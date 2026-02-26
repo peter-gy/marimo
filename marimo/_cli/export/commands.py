@@ -565,6 +565,15 @@ Requires nbformat and nbconvert to be installed.
     help="Scale factor for rasterized output screenshots.",
 )
 @click.option(
+    "--raster-server",
+    type=click.Choice(["static", "live"], case_sensitive=False),
+    default="static",
+    help=(
+        "Server mode used for raster capture. Use 'static' (default) for "
+        "faster captures, or 'live' if outputs require a live Python connection."
+    ),
+)
+@click.option(
     "--watch/--no-watch",
     default=False,
     type=bool,
@@ -608,6 +617,7 @@ def pdf(
     webpdf: bool,
     rasterize_outputs: bool,
     raster_scale: float,
+    raster_server: str,
     sandbox: Optional[bool],
     force: bool,
     args: tuple[str],
@@ -618,9 +628,11 @@ def pdf(
     if not include_outputs:
         rasterize_source = ctx.get_parameter_source("rasterize_outputs")
         raster_scale_source = ctx.get_parameter_source("raster_scale")
+        raster_server_source = ctx.get_parameter_source("raster_server")
         if (
             rasterize_source is not click.core.ParameterSource.DEFAULT
             or raster_scale_source is not click.core.ParameterSource.DEFAULT
+            or raster_server_source is not click.core.ParameterSource.DEFAULT
         ):
             raise click.ClickException(
                 "Rasterization options require --include-outputs."
@@ -685,6 +697,7 @@ def pdf(
     rasterization_options = PDFRasterizationOptions(
         enabled=rasterization_enabled,
         scale=raster_scale,
+        server_mode=raster_server,
     )
 
     def export_callback(
