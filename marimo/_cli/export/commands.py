@@ -666,16 +666,19 @@ def pdf(
 
     cli_args = parse_args(args) if include_outputs else {}
     rasterization_enabled = include_outputs and rasterize_outputs
-    if rasterization_enabled and not DependencyManager.playwright.has():
-        # TODO(peter-gy): migrate this once https://github.com/marimo-team/marimo/pull/8375 get merged
-        raise click.ClickException(
-            "Playwright is required to rasterize HTML outputs for PDF "
-            "export.\n\n"
-            f"  {green('Tip:')} Install with:\n\n"
-            "    python -m pip install playwright\n\n"
-            "  and install Chromium with:\n\n"
-            "    python -m playwright install chromium"
-        )
+    if rasterization_enabled:
+        try:
+            DependencyManager.playwright.require(
+                "for rasterized PDF output export"
+            )
+        except ModuleNotFoundError as e:
+            if getattr(e, "name", None) == "playwright":
+                raise MarimoCLIMissingDependencyError(
+                    "Playwright is required to rasterize HTML outputs for PDF export.",
+                    "playwright",
+                    followup_commands=get_playwright_chromium_setup_commands(),
+                ) from None
+            raise
 
     from marimo._server.export._pdf_raster import PDFRasterizationOptions
 
