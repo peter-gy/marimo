@@ -139,13 +139,26 @@ marimo export pdf notebook.py -o notebook.pdf --no-include-inputs
 
 # Disable rasterized output capture
 marimo export pdf notebook.py -o notebook.pdf --no-include-inputs --no-rasterize-outputs
+
+# Use a live server for raster capture
+marimo export pdf notebook.py -o notebook.pdf --no-include-inputs --raster-server=live
 ```
 
 The `--no-include-inputs` flag hides Python code cells while keeping markdown and cell outputs in the generated PDF.
 
 Rasterized PNG fallback capture for marimo widget HTML (including anywidgets) and Vega outputs is enabled by default before `nbconvert` PDF conversion. Use `--no-rasterize-outputs` to disable it. Rasterization works with both `--webpdf` and `--no-webpdf`.
 
-Rasterization runs only when outputs are included (the default `--include-outputs` mode). Use `--raster-scale` (range `1.0` to `4.0`, default `4.0`) to trade export speed/file size for sharper captured output.
+Rasterization runs only when outputs are included (the default `--include-outputs` mode). Use `--raster-scale` (range `1.0` to `4.0`, default `4.0`) to trade export speed/file size for sharper captured output. Use `--raster-server=static` (default) for a static capture page, or `--raster-server=live` to capture through a live notebook server.
+
+!!! warning "Choose the raster server mode carefully"
+
+    marimo gives you explicit control over raster capture mode.
+    Use `--raster-server=live` when the first meaningful render of a widget or component requires an active Python connection.
+    Otherwise, prefer the default `--raster-server=static`.
+
+    ```bash
+    --raster-server=live
+    ```
 
 !!! note "Rasterization dependencies"
 
