@@ -5,7 +5,7 @@ import threading
 from contextlib import AbstractContextManager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -13,11 +13,13 @@ if TYPE_CHECKING:
 
 
 class _HtmlAssetRequestHandler(SimpleHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
+        server = cast(_HtmlAssetHTTPServer, self.server)
         route = self.path.split("?", 1)[0]
-        dynamic_route = getattr(self.server, "dynamic_route", "")
+        dynamic_route = server.dynamic_route
         if route == dynamic_route:
-            html = getattr(self.server, "dynamic_html", "")
+            with server.dynamic_html_lock:
+                html = server.dynamic_html
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -34,6 +36,7 @@ class _HtmlAssetRequestHandler(SimpleHTTPRequestHandler):
 class _HtmlAssetHTTPServer(ThreadingHTTPServer):
     dynamic_route: str
     dynamic_html: str
+    dynamic_html_lock: threading.Lock
 
 
 class HtmlAssetServer(AbstractContextManager["HtmlAssetServer"]):
@@ -59,9 +62,10 @@ class HtmlAssetServer(AbstractContextManager["HtmlAssetServer"]):
     def set_html(self, html: str) -> None:
         if self._server is None:
             raise RuntimeError("HTML asset server is not running")
-        self._server.dynamic_html = html
+        with self._server.dynamic_html_lock:
+            self._server.dynamic_html = html
 
-    def __enter__(self) -> HtmlAssetServer:
+    def __enter__(self) -> HtmlAssetServer:  # noqa: PYI034
         if not self._directory.is_dir():
             raise RuntimeError(f"Static assets not found at {self._directory}")
 
@@ -72,6 +76,7 @@ class HtmlAssetServer(AbstractContextManager["HtmlAssetServer"]):
         self._server = _HtmlAssetHTTPServer(("127.0.0.1", 0), handler)
         self._server.dynamic_route = self._route
         self._server.dynamic_html = ""
+        self._server.dynamic_html_lock = threading.Lock()
 
         self._thread = threading.Thread(
             target=self._server.serve_forever,
