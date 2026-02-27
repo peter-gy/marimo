@@ -152,13 +152,32 @@ Rasterization runs only when outputs are included (the default `--include-output
 
 !!! warning "Choose the raster server mode carefully"
 
-    marimo gives you explicit control over raster capture mode.
-    Use `--raster-server=live` when the first meaningful render of a widget or component requires an active Python connection.
+    marimo gives you control over how output is captured.
+    Use `--raster-server=live` when a widget needs Python to finish rendering.
     Otherwise, prefer the default `--raster-server=static`.
 
-    ```bash
-    --raster-server=live
-    ```
+The notebook below is a concrete case where `--raster-server=live` helps.
+
+/// marimo-embed-file
+    size: xlarge
+    mode: edit
+    filepath: examples/outputs/live_raster.py
+///
+
+This widget starts at `Initializing...` and then updates to
+`count is ... from ... host` after it receives data from Python.
+Static capture can freeze the initial placeholder; live capture gets the
+updated output.
+
+```bash
+# Static mode captures only the initial "Initializing..." placeholder
+marimo export pdf examples/outputs/live_raster.py \
+  -o live-raster-static.pdf --raster-server=static --no-sandbox --no-include-inputs
+
+# Live mode captures the updated widget output
+marimo export pdf examples/outputs/live_raster.py \
+  -o live-raster-live.pdf --raster-server=live --no-sandbox --no-include-inputs
+```
 
 !!! note "Rasterization dependencies"
 
