@@ -587,7 +587,7 @@ async def _capture_pngs_from_page(
     )
 
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=False)
+        browser = await playwright.chromium.launch()
         context = await browser.new_context(
             viewport={
                 "width": _VIEWPORT_WIDTH,
