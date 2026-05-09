@@ -227,8 +227,16 @@ def _uv_export_script_requirements_txt(
     ]
 
 
-def _resolve_requirements_txt_lines(pyproject: PyProjectReader) -> list[str]:
-    if pyproject.name and pyproject.name.endswith(".py"):
+def _resolve_requirements_txt_lines(
+    pyproject: PyProjectReader,
+    *,
+    export_script_metadata: bool = True,
+) -> list[str]:
+    if (
+        export_script_metadata
+        and pyproject.name
+        and pyproject.name.endswith(".py")
+    ):
         try:
             return _uv_export_script_requirements_txt(pyproject.name)
         except subprocess.CalledProcessError:
@@ -249,7 +257,16 @@ def construct_uv_flags(
     # NB. Used in quarto plugin
 
     # If name if a filepath, parse the dependencies from the file
-    dependencies = _resolve_requirements_txt_lines(pyproject)
+    adding_marimo_features = bool(additional_features) and any(
+        is_marimo_dependency(dep) for dep in pyproject.dependencies
+    )
+    dependencies = _resolve_requirements_txt_lines(
+        pyproject,
+        # uv export resolves transitive deps for the original script metadata.
+        # If we are about to rewrite marimo -> marimo[lsp], resolve from raw
+        # requirements so uv solves the new extra instead of keeping stale pins.
+        export_script_metadata=not adding_marimo_features,
+    )
 
     # If there are no dependencies, which can happen for marimo new or
     # on marimo edit a_new_file.py, uv may use a cached venv, even though

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -15,6 +16,7 @@ from marimo._cli.sandbox import (
     build_sandbox_venv,
     cleanup_sandbox_dir,
     construct_uv_command,
+    construct_uv_flags,
     resolve_sandbox_mode,
 )
 from marimo._dependencies.dependencies import DependencyManager
@@ -190,6 +192,41 @@ import marimo
     assert "--no-project" in uv_cmd
     assert "--compile-bytecode" in uv_cmd
     assert "--sandbox" not in uv_cmd
+
+
+@patch("marimo._cli.sandbox.__version__", "1.0.0")
+@patch("marimo._cli.sandbox.is_editable", return_value=False)
+def test_construct_uv_flags_resolves_marimo_extras_from_raw_script_metadata(
+    mock_is_editable: Any,
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "notebook.py"
+    pyproject = PyProjectReader(
+        {"dependencies": ["marimo"]},
+        config_path=str(script_path),
+        name=str(script_path),
+    )
+
+    with (
+        tempfile.NamedTemporaryFile("w+") as temp_file,
+        patch(
+            "marimo._cli.sandbox._uv_export_script_requirements_txt",
+            return_value=["marimo==1.0.0", "jedi==0.20.0"],
+        ) as uv_export,
+    ):
+        construct_uv_flags(
+            pyproject,
+            temp_file,
+            additional_features=["lsp"],
+            additional_deps=[],
+        )
+        temp_file.flush()
+        temp_file.seek(0)
+        requirements = temp_file.read().splitlines()
+
+    uv_export.assert_not_called()
+    assert requirements == ["marimo[lsp]==1.0.0"]
+    assert mock_is_editable.call_count == 1
 
 
 def test_construct_uv_cmd_with_index_urls() -> None:
