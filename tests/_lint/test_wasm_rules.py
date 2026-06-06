@@ -46,13 +46,13 @@ class TestMW001IncompatibleImports:
         assert "MW001" in codes
         assert any("subprocess" in m for m in messages)
 
-    def test_multiprocessing_flagged(self):
+    def test_multiprocessing_import_not_flagged(self):
         notebook, contents = _load_notebook()
         diagnostics = lint_notebook(
             notebook, contents, lint_config={"select": ["MW001"]}
         )
-        messages = [d.message for d in diagnostics]
-        assert any("multiprocessing" in m for m in messages)
+        messages = " ".join(d.message for d in diagnostics)
+        assert "Module 'multiprocessing'" not in messages
 
     def test_pdb_flagged(self):
         notebook, contents = _load_notebook()
