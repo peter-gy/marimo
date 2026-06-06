@@ -1,9 +1,9 @@
 # Copyright 2026 Marimo. All rights reserved.
-"""WASM-only monkey-patch framework.
+"""WASM-only monkey-patch helpers.
 
-`WasmPatchSet` wraps a target so that when the original raises a caught
-exception, a fallback runs instead. Returns one unpatch handle for all
-patches. No-op outside pyodide.
+`WasmPatchSet` wraps a target call. If the original raises a configured
+exception, the fallback runs. `unpatch_all()` returns one handle that restores
+all active patches. Outside Pyodide, patch registration is inert.
 """
 
 from __future__ import annotations
@@ -12,23 +12,25 @@ import functools
 from collections.abc import Callable
 from typing import Any
 
-from marimo import _loggers
+from marimo._loggers import marimo_logger
 from marimo._utils.platform import is_pyodide
 
-LOGGER = _loggers.marimo_logger()
+LOGGER = marimo_logger()
 
 Unpatch = Callable[[], None]
 Fallback = Callable[..., Any]
-WrapperFactory = Callable[[Callable[..., Any]], Callable[..., Any]]
+WrapperFactory = Callable[[Any], Any]
+_MISSING = object()
 
 
 class WasmPatchSet:
-    """Collects WASM-only monkey-patches with a single unpatch handle.
+    """Collect WASM-only patches behind one restore handle.
 
-    `patch` replaces `owner.attr` with a wrapper: calls original; on
-    `catch` exception, runs `fallback(original, *args, **kwargs)`. If the
-    fallback also raises, re-raises the original with the fallback chained so
-    users see the real underlying error.
+    `patch` replaces `owner.attr` with a wrapper. The wrapper calls the
+    original, then runs `fallback(original, *args, **kwargs)` only when the
+    original raises a configured `catch` exception. If the fallback also
+    raises, callers receive the original exception with the fallback chained as
+    the cause.
     """
 
     def __init__(self) -> None:
@@ -78,6 +80,8 @@ class WasmPatchSet:
         owner: Any,
         attr: str,
         wrapper_factory: WrapperFactory,
+        *,
+        before_restore: Callable[[], None] | None = None,
     ) -> None:
         """Replace `owner.attr` with a WASM-only wrapper.
 
@@ -87,8 +91,8 @@ class WasmPatchSet:
         if not self._active:
             return
 
-        original = getattr(owner, attr, None)
-        if original is None:
+        original = getattr(owner, attr, _MISSING)
+        if original is _MISSING:
             return
 
         wrapper = wrapper_factory(original)
@@ -97,9 +101,15 @@ class WasmPatchSet:
         def _unpatch() -> None:
             # Only restore if we're still the active wrapper.
             if getattr(owner, attr, None) is wrapper:
+                if before_restore is not None:
+                    before_restore()
                 setattr(owner, attr, original)
 
         self._unpatches.append(_unpatch)
+
+    def add_cleanup(self, cleanup: Unpatch) -> None:
+        if self._active:
+            self._unpatches.append(cleanup)
 
     def unpatch_all(self) -> Unpatch:
         """Return a callable that restores all originals (idempotent)."""

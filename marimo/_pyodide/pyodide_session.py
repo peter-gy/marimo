@@ -439,6 +439,11 @@ def _launch_pyodide_kernel(
     user_config: MarimoConfig,
 ) -> RestartableTask:
     from marimo._output.formatters.formatters import register_formatters
+    from marimo._runtime._wasm import (
+        shutdown_wasm_runtime_work_async,
+        unpatch_wasm_process_compatibility,
+        wait_for_wasm_runtime_work_async,
+    )
     from marimo._runtime.kernel_lifecycle import (
         KernelArgs,
         asyncio_queue_reader,
@@ -492,17 +497,51 @@ def _launch_pyodide_kernel(
             kernel.code_completion(request, docstrings_limit=5)
 
     async def listen() -> None:
-        try:
-            await asyncio.gather(
-                listen_messages(
-                    kernel,
-                    control_queue,
-                    set_ui_element_queue,
-                    asyncio_queue_reader,
-                ),
-                listen_completion(),
+        message_task = asyncio.create_task(
+            listen_messages(
+                kernel,
+                control_queue,
+                set_ui_element_queue,
+                asyncio_queue_reader,
             )
+        )
+        completion_task = asyncio.create_task(listen_completion())
+        listener_tasks = (message_task, completion_task)
+        try:
+            done, _pending = await asyncio.wait(
+                listener_tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                task.result()
         finally:
-            teardown_kernel(kernel, ctx)
+            for task in listener_tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*listener_tasks, return_exceptions=True)
+            try:
+                # Cell lifecycle disposal sets `mo.Thread.should_exit`.
+                # Give cooperative WASM work that signal before waiting on it.
+                try:
+                    ctx.cell_lifecycle_registry.dispose_all(deletion=True)
+                except Exception:
+                    LOGGER.exception(
+                        "Failed to dispose Pyodide lifecycle items"
+                    )
+                await wait_for_wasm_runtime_work_async()
+                try:
+                    await shutdown_wasm_runtime_work_async()
+                except Exception:
+                    try:
+                        unpatch_wasm_process_compatibility()
+                    except Exception:
+                        LOGGER.exception(
+                            "Failed to unpatch WASM process compatibility"
+                        )
+                    raise
+                else:
+                    unpatch_wasm_process_compatibility()
+            finally:
+                teardown_kernel(kernel, ctx)
 
-    return RestartableTask(listen)
+    return RestartableTask(listen, restart_on_completion=False)

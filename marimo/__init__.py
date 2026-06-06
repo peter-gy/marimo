@@ -14,6 +14,19 @@ marimo is designed to be:
     5. fun
 """
 
+import sys as _sys
+
+if _sys.platform == "emscripten":
+    # Runtime modules imported below capture `threading.Thread` and
+    # `threading.local`. Bootstrap the default WASM thread/future contract
+    # before those imports so `mo.Thread` and runtime context storage use the
+    # same patched stdlib objects.
+    from marimo._runtime._wasm import (
+        ensure_wasm_runtime_bootstrapped as _ensure_wasm_runtime_bootstrapped,
+    )
+
+    _ensure_wasm_runtime_bootstrapped()
+
 __all__ = [  # noqa: RUF022
     # Core API
     "App",

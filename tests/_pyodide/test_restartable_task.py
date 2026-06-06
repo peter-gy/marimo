@@ -266,3 +266,51 @@ async def test_zero_delay_coro():
         await start_task
     except asyncio.CancelledError:
         pass
+
+
+async def test_restartable_task_can_finish_after_normal_completion() -> None:
+    completion_count = 0
+
+    async def instant_coro() -> None:
+        nonlocal completion_count
+        completion_count += 1
+
+    task = RestartableTask(instant_coro, restart_on_completion=False)
+
+    await asyncio.wait_for(task.start(), timeout=1)
+
+    assert completion_count == 1
+
+
+async def test_restart_request_does_not_leak_after_suppressed_cancellation() -> (
+    None
+):
+    call_count = 0
+    started: asyncio.Queue[int] = asyncio.Queue()
+    suppressed: asyncio.Queue[int] = asyncio.Queue()
+
+    async def suppressing_coro() -> None:
+        nonlocal call_count
+        call_count += 1
+        started.put_nowait(call_count)
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            suppressed.put_nowait(call_count)
+
+    task = RestartableTask(suppressing_coro, restart_on_completion=False)
+    start_task = asyncio.create_task(task.start())
+    try:
+        assert await asyncio.wait_for(started.get(), timeout=1) == 1
+
+        task.restart()
+        assert await asyncio.wait_for(suppressed.get(), timeout=1) == 1
+        assert await asyncio.wait_for(started.get(), timeout=1) == 2
+
+        task.stop()
+        assert await asyncio.wait_for(suppressed.get(), timeout=1) == 2
+        await asyncio.wait_for(start_task, timeout=1)
+        assert call_count == 2
+    finally:
+        if task.task is not None and not task.task.done():
+            task.task.cancel()
