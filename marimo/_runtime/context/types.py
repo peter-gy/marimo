@@ -14,7 +14,9 @@ from typing import TYPE_CHECKING, Any
 
 from marimo._ast.app_config import _AppConfig
 from marimo._messaging.context import HTTP_REQUEST_CTX
+from marimo._messaging.types import Stream
 from marimo._runtime.cell_output_list import CellOutputList
+from marimo._types.ids import CellId_t
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
         InternalApp,
     )
     from marimo._config.config import MarimoConfig
-    from marimo._messaging.types import Stderr, Stdout, Stream
+    from marimo._messaging.types import Stderr, Stdout
     from marimo._plugins.ui._core.registry import UIElementRegistry
     from marimo._runtime import dataflow
     from marimo._runtime.cell_lifecycle_registry import CellLifecycleRegistry
@@ -36,7 +38,6 @@ if TYPE_CHECKING:
     from marimo._runtime.state import State, StateRegistry
     from marimo._runtime.virtual_file import VirtualFileRegistry
     from marimo._save.cache import CacheState
-    from marimo._types.ids import CellId_t
 
 
 class GlobalContext:
@@ -170,6 +171,17 @@ class RuntimeContext(abc.ABC):
     def with_cell_id(self, cell_id: CellId_t) -> Iterator[None]:
         pass
 
+    @abc.abstractmethod
+    def copy_for_thread(
+        self, parent_execution_context: ExecutionContext | None
+    ) -> RuntimeContext:
+        """Return a runtime context copy prepared for `mo.Thread` execution.
+
+        Thread copies isolate execution state and streams, but keep embedded app
+        child ownership with the source context so UI routing and teardown remain
+        session-owned.
+        """
+
     def is_embedded(self) -> bool:
         return self.parent is not None
 
@@ -256,3 +268,59 @@ def runtime_context_installed() -> bool:
         return False
     else:
         return True
+
+
+def make_thread_execution_context(
+    *,
+    stream: Stream,
+    parent_execution_context: ExecutionContext | None,
+) -> ExecutionContext:
+    output = (
+        parent_execution_context.output
+        if parent_execution_context is not None
+        else CellOutputList()
+    )
+    setting_element_value = (
+        parent_execution_context.setting_element_value
+        if parent_execution_context is not None
+        else False
+    )
+    local_cell_id = (
+        parent_execution_context.local_cell_id
+        if parent_execution_context is not None
+        else None
+    )
+    duckdb_connection = (
+        parent_execution_context.duckdb_connection
+        if parent_execution_context is not None
+        else None
+    )
+    cell_id = stream.cell_id
+    if cell_id is None and parent_execution_context is not None:
+        cell_id = parent_execution_context.cell_id
+    if cell_id is None:
+        cell_id = CellId_t("")
+
+    return ExecutionContext(
+        cell_id=cell_id,
+        setting_element_value=setting_element_value,
+        local_cell_id=local_cell_id,
+        output=output,
+        duckdb_connection=duckdb_connection,
+    )
+
+
+def make_cell_execution_context(
+    *,
+    cell_id: CellId_t,
+    parent_execution_context: ExecutionContext | None,
+) -> ExecutionContext:
+    if parent_execution_context is None:
+        return ExecutionContext(cell_id=cell_id, setting_element_value=False)
+    return ExecutionContext(
+        cell_id=cell_id,
+        setting_element_value=parent_execution_context.setting_element_value,
+        local_cell_id=parent_execution_context.local_cell_id,
+        output=parent_execution_context.output,
+        duckdb_connection=parent_execution_context.duckdb_connection,
+    )

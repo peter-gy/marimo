@@ -7,6 +7,12 @@ from marimo._runtime.cell_lifecycle_item import CellLifecycleItem
 from marimo._types.ids import CellId_t
 
 
+class LifecycleDisposeError(Exception):
+    def __init__(self, errors: list[BaseException]) -> None:
+        super().__init__("Failed to dispose lifecycle items")
+        self.errors = errors
+
+
 @dataclasses.dataclass
 class CellLifecycleRegistry:
     registry: dict[CellId_t, set[CellLifecycleItem]] = dataclasses.field(
@@ -52,12 +58,37 @@ class CellLifecycleRegistry:
         # LifecycleItems can request that their `dispose` method is retried in
         # the next cell lifecycle; these items are persisted.
         persisted_lifecycle_items = set()
+        errors: list[BaseException] = []
         if cell_id in self.registry:
-            for lifecycle_item in self.registry[cell_id]:
-                if not lifecycle_item.dispose(context=ctx, deletion=deletion):
+            for lifecycle_item in list(self.registry[cell_id]):
+                try:
+                    should_remove = lifecycle_item.dispose(
+                        context=ctx, deletion=deletion
+                    )
+                except Exception as exc:
+                    errors.append(exc)
+                    persisted_lifecycle_items.add(lifecycle_item)
+                    continue
+
+                if not should_remove:
                     persisted_lifecycle_items.add(lifecycle_item)
 
             if persisted_lifecycle_items:
                 self.registry[cell_id] = persisted_lifecycle_items
             else:
                 del self.registry[cell_id]
+        if errors:
+            raise LifecycleDisposeError(errors)
+
+    def dispose_all(self, deletion: bool) -> None:
+        """Dispose lifecycle items associated with every active cell."""
+        errors: list[BaseException] = []
+        for cell_id in list(self.registry):
+            try:
+                self.dispose(cell_id, deletion=deletion)
+            except LifecycleDisposeError as exc:
+                errors.extend(exc.errors)
+            except Exception as exc:
+                errors.append(exc)
+        if errors:
+            raise LifecycleDisposeError(errors)

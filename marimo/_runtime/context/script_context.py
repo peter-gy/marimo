@@ -18,6 +18,8 @@ from marimo._runtime.context.types import (
     ExecutionContext,
     RuntimeContext,
     initialize_context,
+    make_cell_execution_context,
+    make_thread_execution_context,
 )
 from marimo._runtime.dataflow import DirectedGraph
 from marimo._runtime.functions import FunctionRegistry
@@ -118,23 +120,73 @@ class ScriptRuntimeContext(RuntimeContext):
     def with_cell_id(self, cell_id: CellId_t) -> Iterator[None]:
         old = self.execution_context
         try:
-            if old is not None:
-                setting_element_value = old.setting_element_value
-            else:
-                setting_element_value = False
             self._app.set_execution_context(
-                ExecutionContext(
+                make_cell_execution_context(
                     cell_id=cell_id,
-                    setting_element_value=setting_element_value,
+                    parent_execution_context=old,
                 )
             )
             yield
         finally:
             self._app.set_execution_context(old)
 
+    def copy_for_thread(
+        self, parent_execution_context: ExecutionContext | None
+    ) -> RuntimeContext:
+        stream = self.stream.copy_for_thread()
+        thread_ctx = ThreadScriptRuntimeContext(
+            _app=self._app,
+            ui_element_registry=self.ui_element_registry,
+            state_registry=self.state_registry,
+            function_registry=self.function_registry,
+            cell_lifecycle_registry=self.cell_lifecycle_registry,
+            virtual_file_registry=self.virtual_file_registry,
+            virtual_files_supported=self.virtual_files_supported,
+            app_kernel_runner_registry=self.app_kernel_runner_registry,
+            cache=self.cache,
+            stream=stream,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            children=self.children,
+            parent=self.parent,
+            filename=self.filename,
+            app_config=self.app_config,
+        )
+        thread_ctx._cli_args = self._cli_args
+        thread_ctx._argv = self._argv
+        thread_ctx._query_params = self._query_params
+        thread_ctx._thread_execution_context = make_thread_execution_context(
+            stream=stream,
+            parent_execution_context=parent_execution_context,
+        )
+        return thread_ctx
+
     @property
     def app(self) -> InternalApp:
         return self._app
+
+
+@dataclass
+class ThreadScriptRuntimeContext(ScriptRuntimeContext):
+    """Script runtime context copy used only while `mo.Thread` runs."""
+
+    _thread_execution_context: ExecutionContext | None = None
+
+    @property
+    def execution_context(self) -> ExecutionContext | None:
+        return self._thread_execution_context
+
+    @contextmanager
+    def with_cell_id(self, cell_id: CellId_t) -> Iterator[None]:
+        old = self._thread_execution_context
+        try:
+            self._thread_execution_context = make_cell_execution_context(
+                cell_id=cell_id,
+                parent_execution_context=old,
+            )
+            yield
+        finally:
+            self._thread_execution_context = old
 
 
 def initialize_script_context(
