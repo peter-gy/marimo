@@ -160,6 +160,146 @@ else:
 This is useful for branching logic, such as using `micropip` for package
 installation in WASM while using standard imports locally.
 
+## Threading and multiprocessing
+
+WASM notebooks can run common thread-shaped and process-shaped Python APIs
+without leaving the browser. marimo maps these APIs onto the Pyodide event
+loop, so code that creates workers can execute even though the browser runtime
+does not provide OS threads or child Python processes.
+
+Thread-shaped APIs are APIs that normally create Python threads, such as
+`mo.Thread`, `threading.Thread`, `concurrent.futures.ThreadPoolExecutor`,
+`asyncio.to_thread()`, and `loop.run_in_executor()`.
+
+Process-shaped APIs are APIs that normally create child Python processes, such
+as `multiprocessing.Process`, `multiprocessing.Pool`, `multiprocessing.Queue`,
+and `concurrent.futures.ProcessPoolExecutor`. In WASM, these APIs run in the
+same Python interpreter as the notebook. They do not provide memory isolation,
+signals, child process IDs, or pickle-copy IPC boundaries.
+
+### Start a marimo thread
+
+Use [`mo.Thread`][marimo.Thread] when background work needs to communicate with
+the marimo frontend. In WASM, the thread has a synthetic identity and
+`threading.local()` storage, and `join()` makes progress through the Pyodide
+event loop. Cooperative waits can let scheduled browser-runtime work make
+progress, but they cannot preempt Python code that is currently running.
+
+/// marimo-embed
+    size: large
+    mode: edit
+
+```python
+@app.cell
+def __():
+    import queue
+    import threading
+
+    results = queue.Queue()
+
+    def collect():
+        current = threading.current_thread()
+        results.put(
+            {
+                "thread": current.name,
+                "main thread": current is threading.main_thread(),
+                "identity": threading.get_ident(),
+            }
+        )
+
+    worker = mo.Thread(target=collect, name="example-thread")
+    worker.start()
+    worker.join(timeout=1)
+
+    mo.ui.table([results.get(timeout=1)])
+    return
+```
+
+///
+
+### Run process-shaped code
+
+Use process-shaped APIs when a package expects the `multiprocessing` or
+`ProcessPoolExecutor` interface and the work can run in one browser Python
+interpreter. Worker counts are accepted for API shape, but submitted work is
+serialized, which means marimo drains one submitted item at a time.
+
+/// marimo-embed
+    size: large
+    mode: edit
+
+```python
+@app.cell
+def __():
+    import concurrent.futures
+    import multiprocessing as mp
+
+    def square(value):
+        return value * value
+
+    with mp.Pool(2) as pool:
+        pool_values = pool.map(square, [1, 2, 3])
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
+        executor_values = list(executor.map(square, [4, 5]))
+
+    messages = mp.Queue()
+
+    def report(queue):
+        parent = mp.parent_process()
+        queue.put(
+            {
+                "name": mp.current_process().name,
+                "parent": None if parent is None else parent.name,
+            }
+        )
+
+    process = mp.Process(target=report, args=(messages,), name="example-process")
+    process.start()
+    process.join(timeout=1)
+    process_message = messages.get(timeout=1)
+
+    mo.ui.table(
+        [
+            {
+                "api": "multiprocessing.Pool",
+                "result": str(pool_values),
+                "wasm behavior": "serialized",
+            },
+            {
+                "api": "ProcessPoolExecutor",
+                "result": str(executor_values),
+                "wasm behavior": "serialized",
+            },
+            {
+                "api": "multiprocessing.Process",
+                "result": str(process_message),
+                "wasm behavior": "same interpreter",
+            },
+        ]
+    )
+    return
+```
+
+///
+
+### WASM behavior
+
+| API | WASM behavior |
+| --- | --- |
+| `mo.Thread`, `threading.Thread`, `threading.Timer` | Runs as an asyncio task with synthetic thread identity and thread-local storage. |
+| `threading.Lock`, `RLock`, `Event`, `Condition`, `Semaphore`, `Barrier` | Coordinates work inside the current Pyodide interpreter. Blocking waits are cooperative. |
+| `ThreadPoolExecutor`, `asyncio.to_thread()`, `loop.run_in_executor()` | Accepts the thread-pool API and serializes submitted work on one execution lane. |
+| `multiprocessing.Process` | Runs the target inside the current interpreter with process-shaped metadata such as `name`, `exitcode`, `current_process()`, and `parent_process()`. |
+| `multiprocessing.Queue`, `SimpleQueue` | Stores object references in the same interpreter. Objects are not copied through a pickle IPC boundary. |
+| `multiprocessing.Pool`, `ProcessPoolExecutor` | Accepts pool and future APIs and serializes submitted work on one execution lane. Worker counts and chunk sizes do not create parallel workers. |
+| `multiprocessing.Pipe`, `Manager`, `JoinableQueue`, `Value`, `Array`, `RawValue`, `RawArray` | Unavailable in WASM because they require OS processes, shared memory, or process-backed IPC. |
+
+For real CPU parallelism, run the notebook with marimo on a local machine or
+server. The WASM adapters are for browser notebooks, package compatibility, and
+interactive examples that need to keep working when worker-shaped APIs are
+encountered.
+
 ## Limitations
 
 While WASM notebooks let you share marimo notebooks seamlessly, they have some
@@ -176,8 +316,9 @@ issue](https://github.com/pyodide/pyodide/issues/new?assignees=&labels=new+packa
 
 **PDB.** PDB is not currently supported.
 
-**Threading and multi-processing.** WASM notebooks do not support multithreading
-and multiprocessing. [This may be fixed in the future](https://github.com/pyodide/pyodide/issues/237).
+**Parallel compute.** WASM threading and multiprocessing adapters do not create
+OS threads or child Python processes. Worker-shaped APIs run in the browser's
+current Python interpreter, and submitted pool or executor work is serialized.
 
 **Memory.** WASM notebooks have a memory limit of 2GB; this may be increased
 in the future. If memory consumption is an issue, try offloading memory-intensive
