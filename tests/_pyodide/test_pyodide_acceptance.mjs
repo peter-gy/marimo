@@ -14,6 +14,8 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 
 /**
@@ -85,6 +87,22 @@ function startWheelServer(wheelPath) {
   });
 }
 
+async function importPyodide() {
+  try {
+    return await import("pyodide");
+  } catch (error) {
+    const candidates = [
+      path.resolve(process.cwd(), "node_modules/pyodide/pyodide.mjs"),
+      path.resolve(process.cwd(), "frontend/node_modules/pyodide/pyodide.mjs"),
+    ];
+    const found = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!found) {
+      throw error;
+    }
+    return import(pathToFileURL(found).href);
+  }
+}
+
 /**
  * Main test function
  */
@@ -122,7 +140,7 @@ async function main() {
 
     // Step 2: Load Pyodide
     console.log("Step 2: Loading Pyodide...");
-    const { loadPyodide, version } = await import("pyodide");
+    const { loadPyodide, version } = await importPyodide();
     console.log(`Pyodide version: ${version}`);
 
     // In Node.js, loadPyodide uses the bundled files from the npm package
@@ -398,7 +416,22 @@ assert "2026-01-01" in out, f"expected serialized date in output: {out}"
 print(f"  - write_json fallback handles dates: OK")
 
 print("polars WASM I/O patches verified")
-`);
+    `);
+    console.log("");
+
+    console.log("Step 8: Running WASM concurrency matrix...");
+    const matrixScript = path.resolve(
+      "tests/_pyodide/test_wasm_concurrency_matrix.mjs",
+    );
+    const matrixResult = spawnSync(
+      process.execPath,
+      ["--experimental-wasm-jspi", matrixScript, absoluteWheelPath],
+      { stdio: "inherit" },
+    );
+    if (matrixResult.status !== 0) {
+      throw new Error("WASM concurrency matrix failed");
+    }
+    console.log("WASM concurrency matrix verified");
     console.log("");
 
     console.log("");
