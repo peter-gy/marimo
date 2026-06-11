@@ -87,14 +87,28 @@ class CachedLifecycle:
                 self._attempts.pop(cell_id, None)
                 # Fall through to miss-path execution.
             else:
-                self._manifest_keys[cell_id] = str(
-                    self._loader.build_path(attempt.key)
-                )
-                return Skip(
-                    result=RunResult(
-                        output=attempt.meta.get("return"), exception=None
+                if self._restored_ui_defs(attempt, glbls):
+                    # A restored UIElement carries a fresh object id while
+                    # the cached output HTML embeds the saving session's —
+                    # the frontend and kernel would disagree and events go
+                    # nowhere. UI construction is cheap and inherently
+                    # session state: run the cell live instead.
+                    LOGGER.debug(
+                        "Cache hit for %s defines UI elements; running "
+                        "live to register them with this session",
+                        cell_id,
                     )
-                )
+                    self._attempts.pop(cell_id, None)
+                    # Fall through to miss-path execution.
+                else:
+                    self._manifest_keys[cell_id] = str(
+                        self._loader.build_path(attempt.key)
+                    )
+                    return Skip(
+                        result=RunResult(
+                            output=attempt.meta.get("return"), exception=None
+                        )
+                    )
 
         # Pre-flight refs against UnhashableStubs left in scope by upstream
         # cached producers. Raises MarimoCancelCellError if any ref is a
@@ -140,6 +154,15 @@ class CachedLifecycle:
             # Best-effort: save failures (incl. CacheException, which
             # extends BaseException) must never break the teardown chain.
             LOGGER.warning("Cache save failed for %s: %s", cell_id, e)
+
+    @staticmethod
+    def _restored_ui_defs(attempt: Cache, glbls: MutableGlobals) -> bool:
+        """True if any def restored from the cache is a live UIElement."""
+        from marimo._plugins.ui._core.ui_element import UIElement
+
+        return any(
+            isinstance(glbls.get(name), UIElement) for name in attempt.defs
+        )
 
     def _preflight_refs(self, cell: CellImpl, glbls: MutableGlobals) -> None:
         """Detect UnhashableStub residues in refs; requeue producers.
