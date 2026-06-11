@@ -792,14 +792,11 @@ def _execute_and_copy_caches(marimo_file: MarimoPath) -> None:
     import shutil
 
     from marimo._server.export import run_app_until_completion
-    from marimo._server.file_router import AppFileRouter
     from marimo._server.utils import asyncio_run
+    from marimo._session.notebook import load_notebook
     from marimo._utils.paths import notebook_output_dir
 
-    file_router = AppFileRouter.from_filename(marimo_file)
-    file_key = file_router.get_unique_file_key()
-    assert file_key is not None
-    file_manager = file_router.get_file_manager(file_key)
+    file_manager = load_notebook(marimo_file.absolute_name)
 
     async def _run() -> bool:
         _view, did_error = await run_app_until_completion(
