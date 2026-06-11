@@ -94,6 +94,12 @@ def to_item(
             hash=hash,
             type_hint=type_hint,
         )
+    if loader == "pt":
+        return Item(
+            reference=(path / f"{var_name}.pt").as_posix(),
+            hash=hash,
+            type_hint=type_hint,
+        )
     if loader == "ui":
         return Item(reference=(path / "ui.pickle").as_posix())
     if isinstance(value, FunctionStub):
