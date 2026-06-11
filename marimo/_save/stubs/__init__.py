@@ -9,6 +9,7 @@ from marimo._save.stubs.class_stub import ClassStub
 from marimo._save.stubs.function_stub import FunctionStub
 from marimo._save.stubs.lazy_stub import LAZY_STUB_LOOKUP, ReferenceStub
 from marimo._save.stubs.module_stub import ModuleStub
+from marimo._save.stubs.onnx_stub import OnnxRuntime, OnnxRuntimeStub
 from marimo._save.stubs.pydantic_stub import PydanticStub
 from marimo._save.stubs.stubs import (
     CUSTOM_STUBS,
@@ -27,6 +28,7 @@ _REGISTERED_NAMES: set[str] = set()
 # Dictionary mapping fully qualified class names to registration functions
 STUB_REGISTRATIONS: dict[str, Callable[[Any], None]] = {
     "pydantic.main.BaseModel": PydanticStub.register,
+    "marimo._save.stubs.onnx_stub.OnnxRuntime": OnnxRuntimeStub.register,
 }
 
 
@@ -76,6 +78,8 @@ def maybe_get_custom_stub(value: Any) -> CustomStub | None:
 
 
 __all__ = [
+    "OnnxRuntime",
+    "OnnxRuntimeStub",
     "CUSTOM_STUBS",
     "LAZY_STUB_LOOKUP",
     "ClassStub",
