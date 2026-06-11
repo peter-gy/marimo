@@ -23,9 +23,11 @@ class MissingModule(ModuleType):
         self.__missing__ = True
 
     def __getattr__(self, attr: str) -> Any:
-        # Dunder probes (e.g. pickling, repr machinery) fall through to
-        # ModuleType defaults via __getattribute__; only real attribute
-        # use lands here.
+        if attr.startswith("__") and attr.endswith("__"):
+            # Dunder probes — pickling machinery, repr, and
+            # getattr-with-default version lookups — must fall back
+            # rather than propagate an import error.
+            raise AttributeError(attr)
         raise ModuleNotFoundError(
             f"No module named {self.__name__!r} in this environment "
             f"(cached def restored lazily; accessing "

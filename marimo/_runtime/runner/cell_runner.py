@@ -168,7 +168,18 @@ class Runner:
                 CachedLifecycle,
             )
 
-            lifecycles.append(CachedLifecycle(self.graph))
+            lifecycles.append(
+                CachedLifecycle(
+                    self.graph,
+                    # Pinning trades staleness protection for key
+                    # portability: a cache exported across environments
+                    # (e.g. into a WASM bundle) only hits when module
+                    # versions are excluded from the key.
+                    pin_modules=user_config.get("runtime", {}).get(
+                        "pin_modules", True
+                    ),
+                )
+            )
         self._evaluator = Evaluator(
             executor=resolve_executor(), lifecycles=lifecycles
         )

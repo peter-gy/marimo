@@ -55,8 +55,9 @@ class CachedLifecycle:
 
     name = "cached"
 
-    def __init__(self, graph: DirectedGraph) -> None:
+    def __init__(self, graph: DirectedGraph, pin_modules: bool = True) -> None:
         self._graph = graph
+        self._pin_modules = pin_modules
         self._loader = LazyLoader(name="lazy")
         # Per-cell state — populated in setup, consumed in teardown.
         self._attempts: dict[CellId_t, Cache] = {}
@@ -74,7 +75,7 @@ class CachedLifecycle:
             cell_id,
             glbls,
             loader=self._loader,
-            pin_modules=True,
+            pin_modules=self._pin_modules,
         )
         self._attempts[cell_id] = attempt
 
