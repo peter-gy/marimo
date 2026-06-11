@@ -281,7 +281,14 @@ class LazyStore(WasmExportableStore):
                 *(_fetch_one(k) for k in keys_list)
             )
 
-        results = loop.run_until_complete(_fetch_all())
+        try:
+            results = loop.run_until_complete(_fetch_all())
+        except Exception:
+            # run_until_complete on the live pyodide loop requires JSPI
+            # (WebAssembly stack switching), which e.g. Firefox lacks.
+            # Fall back to sequential synchronous XHR via the
+            # pyodide_http-patched urllib — legal in a worker.
+            results = [(k, self._http_get(k)) for k in keys_list]
         yield from results
 
 
@@ -456,17 +463,34 @@ class LazyLoader(BasePersistenceLoader):
         # PASS 2: deserialize each .pickle blob through a namespace-aware
         # unpickler when `glbls` is available, so __main__ refs resolve
         # against the cell scope (PASS 1 + cells already run this kernel).
+        _blob_vars = {key: var for var, key in ref_vars.items()}
+
         def _deserialize_blob(key: str, data: bytes) -> Any:
             ext = Path(key).suffix
             type_hint = ref_type_hints.get(key) or (
                 return_type_hint if key == return_ref else None
             )
-            if ext == ".pickle" and glbls is not None:
-                return pickle_load_with_namespace(data, type_hint, glbls)
-            deserialize = BLOB_DESERIALIZERS.get(
-                ext, BLOB_DESERIALIZERS[".pickle"]
-            )
-            return deserialize(data, type_hint)
+            try:
+                if ext == ".pickle" and glbls is not None:
+                    return pickle_load_with_namespace(data, type_hint, glbls)
+                deserialize = BLOB_DESERIALIZERS.get(
+                    ext, BLOB_DESERIALIZERS[".pickle"]
+                )
+                return deserialize(data, type_hint)
+            except ModuleNotFoundError as e:
+                # Typed codecs (.pt / .npy / .arrow) and pickled special
+                # types require their package. In an environment without
+                # it (e.g. torch tensors restored in WASM) the def binds
+                # as a use-site tripwire: harmless until touched, and any
+                # real access surfaces this error through the stub.
+                stub = UnhashableStub(
+                    var_name=_blob_vars.get(key, ""),
+                    error_msg=str(e),
+                )
+                if type_hint:
+                    stub.type_name = type_hint
+                LOGGER.warning("Binding %s as tripwire: %s", key, e)
+                return stub
 
         unpickled: dict[str, Any] = {}
 

@@ -323,13 +323,24 @@ class Cache:
 
         if inspect.ismodule(value):
             result = ModuleStub(value)
-        elif inspect.isfunction(value) and value.__name__ != "<lambda>":
+        elif (
+            inspect.isfunction(value)
+            and value.__name__ != "<lambda>"
+            and getattr(value, "__module__", "__main__") == "__main__"
+        ):
             # Lambdas can't round-trip via FunctionStub: inspect.getsource
             # returns the line *containing* the lambda (e.g.
             # "return model, lambda inp: model(inp)"), which fails to
             # compile as a module. Let lambdas fall through to the pickle
             # path so they get recorded as UnhashableStub on save and
             # trigger a re-run on load.
+            #
+            # Same gate as classes below: only cell-defined (__main__)
+            # functions need source capture. An imported function (e.g.
+            # `from sklearn.datasets import load_digits` in a cell)
+            # re-exec'd from source loses its defining module's globals
+            # (decorators, helpers) — pickle's by-reference semantics
+            # restore it correctly instead.
             result = FunctionStub(value)
         elif (
             inspect.isclass(value)
