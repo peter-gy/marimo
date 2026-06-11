@@ -94,6 +94,7 @@ class Cache(msgspec.Struct):
 #   "pickle"  — per-variable .pickle blob (default fallback)
 #   "npy"     — numpy .npy blob
 #   "arrow"   — Arrow IPC .arrow blob (polars and pandas)
+#   "pt"      — torch .pt blob (torch.save / torch.load)
 LAZY_STUB_LOOKUP: dict[str, str] = {
     "builtins.int": "inline",
     "builtins.str": "inline",
@@ -116,6 +117,9 @@ LAZY_STUB_LOOKUP: dict[str, str] = {
     "pandas.core.frame.DataFrame": "arrow",
     "pandas.Series": "arrow",
     "pandas.core.series.Series": "arrow",
+    # Subclasses (e.g. torch.nn.Parameter) resolve here through the MRO
+    # walk in maybe_update_lazy_stub; torch.save round-trips them intact.
+    "torch.Tensor": "pt",
 }
 
 # Runtime cache: type → loader string, populated by maybe_update_lazy_stub().
@@ -174,6 +178,17 @@ def _arrow_load(data: bytes, type_hint: str | None = None) -> Any:
     return result
 
 
+def _pt_load(data: bytes, type_hint: str | None = None) -> Any:
+    DependencyManager.torch.require("to load cached torch tensors.")
+    import torch
+
+    del type_hint
+    # weights_only restricts unpickling to tensor payloads; a tensor saved
+    # on an unavailable device fails loudly here, and the cache falls back
+    # to recomputation rather than silently relocating the value.
+    return torch.load(io.BytesIO(data), weights_only=True)
+
+
 def _pickle_load(data: bytes, type_hint: str | None = None) -> Any:
     del type_hint
     return pickle.loads(data)
@@ -183,6 +198,7 @@ BLOB_DESERIALIZERS: dict[str, Callable[[bytes, str | None], Any]] = {
     ".pickle": _pickle_load,
     ".npy": _npy_load,
     ".arrow": _arrow_load,
+    ".pt": _pt_load,
 }
 
 # ---------------------------------------------------------------------------
@@ -222,10 +238,21 @@ def _arrow_dump(obj: Any) -> bytes:
     return buf.getvalue()
 
 
+def _pt_dump(obj: Any) -> bytes:
+    # A live tensor in scope implies torch is importable; no fallback
+    # needed (unlike _arrow_dump, where pandas can exist without pyarrow).
+    import torch
+
+    buf = io.BytesIO()
+    torch.save(obj, buf)
+    return buf.getvalue()
+
+
 BLOB_SERIALIZERS: dict[str, Callable[[Any], bytes]] = {
     "pickle": pickle.dumps,
     "npy": _npy_dump,
     "arrow": _arrow_dump,
+    "pt": _pt_dump,
 }
 
 # ---------------------------------------------------------------------------
