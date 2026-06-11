@@ -43,7 +43,7 @@ class WasmExportableStore(Store):
 
     @abstractmethod
     def export_manifest(self) -> list[str]:
-        """Return list of all store keys written during this session.
+        """Return all store keys this session wrote or read.
 
         Used by --execute export to know exactly which files to copy
         to public/cache/ for WASM bundling.

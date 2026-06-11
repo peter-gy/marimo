@@ -182,11 +182,16 @@ class LazyStore(WasmExportableStore):
                 inner = FileStore()
         self._inner = inner
         self._written_keys: set[str] = set()
+        # Keys successfully read this session. A warm re-export hits
+        # the cache rather than re-writing it, so the export manifest
+        # must cover reads too or the bundle ships incomplete.
+        self._touched_keys: set[str] = set()
         print(f"[lazy] LazyStore.__init__: inner={type(inner).__name__}, id={id(inner)}")
 
     def get(self, key: str) -> bytes | None:
         result = self._inner.get(key)
         if result is not None:
+            self._touched_keys.add(key)
             return result
         if is_pyodide() and key not in _POISONED_KEYS:
             return self._http_get(key)
@@ -197,10 +202,14 @@ class LazyStore(WasmExportableStore):
         return self._inner.put(key, value)
 
     def hit(self, key: str) -> bool:
-        return self._inner.hit(key)
+        result = self._inner.hit(key)
+        if result:
+            self._touched_keys.add(key)
+        return result
 
     def clear(self, key: str) -> bool:
         self._written_keys.discard(key)
+        self._touched_keys.discard(key)
         return self._inner.clear(key)
 
     def get_batch(
@@ -227,7 +236,7 @@ class LazyStore(WasmExportableStore):
                 yield k, self.get(k)
 
     def export_manifest(self) -> list[str]:
-        return sorted(self._written_keys)
+        return sorted(self._written_keys | self._touched_keys)
 
     # -- WASM internals --
 
