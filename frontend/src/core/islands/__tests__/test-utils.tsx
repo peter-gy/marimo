@@ -146,6 +146,7 @@ export async function waitForNoError<T>(
 
 export interface IslandSpec {
   appId?: string;
+  cellId?: string;
   reactive?: boolean;
   code?: string;
   output?: string;
@@ -160,6 +161,9 @@ export function buildIslandHTML(islands: IslandSpec[]): string {
   return islands
     .map((spec) => {
       const appId = spec.appId ?? "test-app";
+      const cellIdAttr = spec.cellId
+        ? ` ${ISLAND_DATA_ATTRIBUTES.CELL_ID}="${spec.cellId}"`
+        : "";
       const reactive = spec.reactive ?? true;
       const output = spec.output ?? "<div>output</div>";
       const code = spec.code ?? 'print("hello")';
@@ -169,7 +173,7 @@ export function buildIslandHTML(islands: IslandSpec[]): string {
         : "";
       const outputTag = `<${ISLAND_TAG_NAMES.CELL_OUTPUT}>${output}</${ISLAND_TAG_NAMES.CELL_OUTPUT}>`;
 
-      return `<${ISLAND_TAG_NAMES.ISLAND} ${ISLAND_DATA_ATTRIBUTES.APP_ID}="${appId}" ${ISLAND_DATA_ATTRIBUTES.REACTIVE}="${reactive}">${outputTag}${codeTag}</${ISLAND_TAG_NAMES.ISLAND}>`;
+      return `<${ISLAND_TAG_NAMES.ISLAND} ${ISLAND_DATA_ATTRIBUTES.APP_ID}="${appId}"${cellIdAttr} ${ISLAND_DATA_ATTRIBUTES.REACTIVE}="${reactive}">${outputTag}${codeTag}</${ISLAND_TAG_NAMES.ISLAND}>`;
     })
     .join("\n");
 }

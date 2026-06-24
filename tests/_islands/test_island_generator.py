@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from marimo import __version__
 from marimo._ast.app_config import _AppConfig
 from marimo._islands._island_generator import (
+    ISLANDS_JSON_SCRIPT_TYPE,
     MarimoIslandGenerator,
 )
 from tests.mocks import snapshotter
@@ -103,6 +105,111 @@ async def test_render_multiline_markdown():
     )
     await generator.build()
     snapshot("markdown.txt", stub.render())
+
+
+async def test_render_payload():
+    generator = MarimoIslandGenerator()
+    generator.add_code("import marimo as mo")
+    generator.add_code("mo.md('Hello, payload!')")
+    generator.add_code(
+        "mo.md('Static payload')",
+        is_reactive=False,
+    )
+
+    await generator.build()
+
+    payload = generator.render_payload()
+    assert payload["schemaVersion"] == 1
+    assert payload["appId"] == "main"
+    reactive_cell = payload["cells"][1]
+    assert reactive_cell["cellId"]
+    assert reactive_cell["code"] == "mo.md('Hello, payload!')"
+    assert reactive_cell["reactive"] is True
+    assert reactive_cell["displayCode"] is False
+    assert reactive_cell["displayOutput"] is True
+    assert "Hello, payload!" in reactive_cell["outputHtml"]
+
+    static_cell = payload["cells"][2]
+    assert static_cell["cellId"]
+    assert static_cell["code"] == ""
+    assert static_cell["reactive"] is False
+
+
+async def test_render_payload_keeps_visible_non_reactive_code():
+    generator = MarimoIslandGenerator()
+    generator.add_code(
+        "value = 'visible static source'",
+        display_code=True,
+        is_reactive=False,
+    )
+
+    await generator.build()
+
+    payload = generator.render_payload()
+    assert payload["cells"][0]["code"] == "value = 'visible static source'"
+    assert payload["cells"][0]["reactive"] is False
+    assert payload["cells"][0]["displayCode"] is True
+
+
+async def test_render_payload_uses_rendered_reactive_override():
+    generator = MarimoIslandGenerator()
+    stub = generator.add_code("value = 'static render override'")
+
+    await generator.build()
+    stub.render(is_reactive=False)
+
+    payload = generator.render_payload()
+    assert payload["cells"][0]["code"] == ""
+    assert payload["cells"][0]["reactive"] is False
+
+
+async def test_render_payload_uses_rendered_display_override():
+    generator = MarimoIslandGenerator()
+    stub = generator.add_code("mo.md('hidden output')")
+
+    await generator.build()
+    stub.render(display_output=False)
+
+    payload = generator.render_payload()
+    assert payload["cells"][0]["outputHtml"] == ""
+    assert payload["cells"][0]["displayOutput"] is False
+
+
+def test_render_payload_script_escapes_json():
+    generator = MarimoIslandGenerator()
+    generator.add_code("value = '</script><div>'")
+
+    script = generator.render_payload_script()
+
+    assert script.startswith(f'<script type="{ISLANDS_JSON_SCRIPT_TYPE}">')
+    assert script.endswith("</script>")
+    assert "</script><div>" not in script
+    script_text = script.removeprefix(
+        f'<script type="{ISLANDS_JSON_SCRIPT_TYPE}">'
+    ).removesuffix("</script>")
+    payload = json.loads(script_text)
+    assert payload["cells"][0]["code"] == "value = '</script><div>'"
+
+
+def test_render_body_includes_payload_after_visible_islands():
+    generator = MarimoIslandGenerator()
+    generator.add_code("mo.md('Hello, payload!')")
+
+    body_html = generator.render_body()
+
+    assert body_html.index("<marimo-island") < body_html.index(
+        f'<script type="{ISLANDS_JSON_SCRIPT_TYPE}">'
+    )
+    assert "Hello%2C%20payload!" in body_html
+
+
+def test_render_body_can_omit_payload():
+    generator = MarimoIslandGenerator()
+    generator.add_code("mo.md('Hello, payload!')")
+
+    body_html = generator.render_body(include_payload=False)
+
+    assert f'<script type="{ISLANDS_JSON_SCRIPT_TYPE}">' not in body_html
 
 
 async def test_from_file(tmp_path: Path):

@@ -1,8 +1,12 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
 import { Logger } from "@/utils/Logger";
-import type { MarimoIslandApp } from "./app";
 import { getIslandElements, parseIslandElementsIntoApps } from "./dom";
+import {
+  parseIslandElementsWithPayload,
+  parseMarimoIslandPayloadResult,
+} from "./payload";
+import type { MarimoIslandApp } from "./app";
 
 /**
  * Parses marimo island apps from the DOM
@@ -11,11 +15,19 @@ import { getIslandElements, parseIslandElementsIntoApps } from "./dom";
 export function parseMarimoIslandApps(
   root: Document | Element = document,
 ): MarimoIslandApp[] {
-  const embeds = getIslandElements(root);
-  if (embeds.length === 0) {
+  const payloadResult = parseMarimoIslandPayloadResult(root);
+  const domEmbeds = getIslandElements(root);
+  if (domEmbeds.length === 0) {
+    if (payloadResult !== null) {
+      return payloadResult.apps;
+    }
     Logger.warn("No embedded marimo apps found.");
     return [];
   }
 
-  return parseIslandElementsIntoApps(embeds);
+  if (!payloadResult) {
+    return parseIslandElementsIntoApps(domEmbeds);
+  }
+
+  return parseIslandElementsWithPayload(domEmbeds, payloadResult);
 }

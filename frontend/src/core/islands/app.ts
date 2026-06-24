@@ -13,6 +13,10 @@ export interface MarimoIslandApp {
 
 export interface MarimoIslandCell {
   /**
+   * Cell identifier from the serialized notebook.
+   */
+  cellId?: string;
+  /**
    * Output of the cell.
    */
   output: string;

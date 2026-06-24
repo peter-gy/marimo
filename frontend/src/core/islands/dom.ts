@@ -140,3 +140,7 @@ export function extractIslandCodeFromEmbed(embed: HTMLElement): string {
 
   return "";
 }
+
+export function isReactiveIsland(embed: HTMLElement): boolean {
+  return embed.getAttribute(ISLAND_DATA_ATTRIBUTES.REACTIVE) === "true";
+}

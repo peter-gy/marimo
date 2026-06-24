@@ -72,16 +72,20 @@ export class MarimoIslandElement extends HTMLElement {
    * Returns undefined for non-reactive islands (they have no corresponding cell).
    */
   get cellId(): CellId | undefined {
+    if (!this.isReactive) {
+      return undefined;
+    }
+
+    const cellIdx = this.getAttribute(ISLAND_DATA_ATTRIBUTES.CELL_IDX);
+    if (cellIdx) {
+      return this.getCellIdFromIndex(Number.parseInt(cellIdx, 10));
+    }
+
     const cellId = this.getAttribute(ISLAND_DATA_ATTRIBUTES.CELL_ID);
     if (cellId) {
       return cellId as CellId;
     }
-
-    const cellIdx = this.getAttribute(ISLAND_DATA_ATTRIBUTES.CELL_IDX);
-    if (!cellIdx) {
-      return undefined;
-    }
-    return this.getCellIdFromIndex(Number.parseInt(cellIdx, 10));
+    return undefined;
   }
 
   /**
@@ -134,7 +138,7 @@ export class MarimoIslandElement extends HTMLElement {
 
     // Read objectId directly from the DOM before createRoot clears children.
     // optionalEditor is a <RenderHTML> wrapper, so its .props don't carry the
-    // underlying element's attributes — we must grab objectId here instead.
+    // underlying element's attributes, so grab objectId here instead.
     const editorElement = this.querySelector(MarimoIslandElement.editorTagName);
     const editorObjectId = (
       editorElement?.parentElement as Element | null
@@ -166,12 +170,15 @@ export class MarimoIslandElement extends HTMLElement {
     const isEmpty = trimmedHtml === "<span></span>" || trimmedHtml === "";
     const initialHtml = isEmpty ? null : renderHTML({ html: trimmedHtml });
 
-    // Non-reactive islands have no cell in the kernel — just render static HTML
+    // Non-reactive islands have no cell in the kernel, so render static HTML.
     if (!cellId) {
       this.root?.render(
         <ErrorBoundary>
           <Provider store={store}>
-            <LocaleProvider>{initialHtml}</LocaleProvider>
+            <LocaleProvider>
+              {initialHtml}
+              {editor}
+            </LocaleProvider>
           </Provider>
         </ErrorBoundary>,
       );
