@@ -18,7 +18,7 @@ import {
   ISLAND_DATA_ATTRIBUTES,
   ISLAND_TAG_NAMES,
 } from "../constants";
-import { extractIslandCodeFromEmbed } from "../parse";
+import { extractIslandCodeFromEmbed } from "../dom";
 import { MarimoOutputWrapper } from "./output-wrapper";
 
 /**

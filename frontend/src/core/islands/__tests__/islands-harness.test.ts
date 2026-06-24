@@ -5,8 +5,8 @@ import {
   extractIslandCodeFromEmbed,
   parseIslandElement,
   parseIslandElementsIntoApps,
-  parseMarimoIslandApps,
-} from "../parse";
+} from "../dom";
+import { parseMarimoIslandApps } from "../parse";
 import {
   buildIslandHTML,
   createIslandHarness,

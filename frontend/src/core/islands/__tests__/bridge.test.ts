@@ -78,6 +78,9 @@ vi.mock("@/core/wasm/rpc", () => ({
 // Mock the parse module to avoid DOM dependencies
 vi.mock("../parse", () => ({
   parseMarimoIslandApps: mockParseMarimoIslandApps,
+}));
+
+vi.mock("../app", () => ({
   createMarimoFile: mockCreateMarimoFile,
 }));
 
