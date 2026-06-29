@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING, Any
 
 from marimo._save.stubs.class_stub import ClassStub
 from marimo._save.stubs.function_stub import FunctionStub
-from marimo._save.stubs.lazy_stub import LAZY_STUB_LOOKUP, ReferenceStub
+from marimo._save.stubs.lazy_stub import (
+    LAZY_STUB_LOOKUP,
+    BlobAsset,
+    ReferenceStub,
+)
 from marimo._save.stubs.module_stub import ModuleStub
 from marimo._save.stubs.onnx_stub import OnnxRuntime, OnnxRuntimeStub
 from marimo._save.stubs.pydantic_stub import PydanticStub
@@ -78,14 +82,15 @@ def maybe_get_custom_stub(value: Any) -> CustomStub | None:
 
 
 __all__ = [
-    "OnnxRuntime",
-    "OnnxRuntimeStub",
     "CUSTOM_STUBS",
     "LAZY_STUB_LOOKUP",
+    "BlobAsset",
     "ClassStub",
     "CustomStub",
     "FunctionStub",
     "ModuleStub",
+    "OnnxRuntime",
+    "OnnxRuntimeStub",
     "ReferenceStub",
     "UIElementStub",
     "maybe_get_custom_stub",

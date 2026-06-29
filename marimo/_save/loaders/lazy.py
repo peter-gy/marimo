@@ -109,6 +109,12 @@ def to_item(
             hash=hash,
             type_hint=type_hint,
         )
+    if loader == "asset":
+        return Item(
+            reference=(path / f"{var_name}.asset").as_posix(),
+            hash=hash,
+            type_hint=type_hint,
+        )
     if loader == "ui":
         return Item(reference=(path / "ui.pickle").as_posix())
     if isinstance(value, FunctionStub):
