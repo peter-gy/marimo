@@ -1,0 +1,19 @@
+tests/test_keyboard_shortcuts.py
+  s_ce0007c7e3da44::t_54073b81c4156a 36,51-52,64,79,98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b31c2936500027b25c9afe38768f756fbbd0d79",
+  "prompts": {},
+  "sessions": {
+    "s_ce0007c7e3da44": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a018a9-0e00-7bf1-9a71-9137ce78cac6",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
