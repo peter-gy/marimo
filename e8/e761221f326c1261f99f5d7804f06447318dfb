@@ -1,0 +1,25 @@
+tests/test_keyboard_shortcuts.py
+  s_ce0007c7e3da44::t_a9950ffad3f537 39-41,47-48,58-65,71-74,76,80-90
+  s_ce0007c7e3da44::t_1fafb576909847 5
+  s_ce0007c7e3da44::t_1917578aca1f68 36,51-56
+  s_ce0007c7e3da44::t_84fc6f4e3bcf1f 42-46,66-70
+  s_ce0007c7e3da44::t_ca89841f398860 91-95,99-104,106
+marimo/_entrypoints/keyboard_shortcuts.py
+  s_ce0007c7e3da44::t_5fef12dcffd7e2 4,44-45,53,62-97,100-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e8e761221f326c1261f99f5d7804f06447318dfb",
+  "prompts": {},
+  "sessions": {
+    "s_ce0007c7e3da44": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a018a9-0e00-7bf1-9a71-9137ce78cac6",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
