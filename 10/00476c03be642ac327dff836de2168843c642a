@@ -1,0 +1,21 @@
+frontend/src/__tests__/main.test.tsx
+  s_ce0007c7e3da44::t_e1aed96a328c9d 172-192
+frontend/src/mount.tsx
+  s_ce0007c7e3da44::t_e1aed96a328c9d 150-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1000476c03be642ac327dff836de2168843c642a",
+  "prompts": {},
+  "sessions": {
+    "s_ce0007c7e3da44": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a018a9-0e00-7bf1-9a71-9137ce78cac6",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
