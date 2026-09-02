@@ -1,0 +1,30 @@
+frontend/src/core/cells/__tests__/document-changes.test.ts
+  s_c289a243400fff::t_dbb6e52988e61d 846-848
+  s_c289a243400fff::t_ad849e542e81fb 49,1007-1017,1020-1055
+  s_c289a243400fff::t_8e5cf080eae46b 1018-1019
+frontend/src/core/cells/document-changes.ts
+  s_c289a243400fff::t_8e5cf080eae46b 20,639,697-701,777-783,790-813,920-921
+  s_c289a243400fff::t_dbb6e52988e61d 784-788
+  s_c289a243400fff::t_ee0c3ffa69e8ed 789
+frontend/src/core/saving/save-component.tsx
+  s_c289a243400fff::t_ee0c3ffa69e8ed 24
+  s_c289a243400fff::t_229d9f89e535bc 29-30
+  s_c289a243400fff::t_8e5cf080eae46b 139-149,159,161
+  s_c289a243400fff::t_4cd84150d8f7fd 135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "91ca083e37be251e50db2dcd927ea4dc85b3134f",
+  "prompts": {},
+  "sessions": {
+    "s_c289a243400fff": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0499a-fb29-7f31-9133-233c03ffd070",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
