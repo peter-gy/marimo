@@ -1,0 +1,25 @@
+marimo/_ast/app.py
+  s_c289a243400fff::t_6c9232b496a0bf 1028-1044,1059-1062
+tests/_server/api/endpoints/test_kiosk.py
+  s_c289a243400fff::t_6c9232b496a0bf 28-29,69-97
+marimo/_session/notebook/file_manager.py
+  s_c289a243400fff::t_6c9232b496a0bf 40,418-423,428-429,457-464
+marimo/_server/api/endpoints/files.py
+  s_c289a243400fff::t_6c9232b496a0bf 12-14,190-197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2d8309e3d5a72cc834199daebf3d146c79d48a1f",
+  "prompts": {},
+  "sessions": {
+    "s_c289a243400fff": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0499a-fb29-7f31-9133-233c03ffd070",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
