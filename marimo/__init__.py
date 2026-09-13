@@ -186,15 +186,25 @@ def _mount_lens(
         not result.success()
         or not running_in_notebook()
         or cell.namespace_to_variable("marimo") is None
-        or find_spec("marimo_lens") is None
     ):
         return
 
-    from marimo_lens import Lens  # type: ignore[import-not-found]
+    try:
+        if find_spec("marimo_lens") is None:
+            return
 
-    if result.output is not None:
-        output.append(result.output)
-    output.append(Lens())
+        from marimo_lens import Lens  # type: ignore[import-not-found]
+
+        lens = Lens()
+        if result.output is not None:
+            output.append(result.output)
+        output.append(lens)
+    except Exception:
+        from marimo import _loggers
+
+        _loggers.marimo_logger().warning(
+            "Failed to automatically mount marimo-lens", exc_info=True
+        )
 
 
 _post_execution_hooks.append(_mount_lens)
