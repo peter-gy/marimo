@@ -196,6 +196,7 @@ def _mount_lens(
         from marimo_lens import Lens  # type: ignore[import-not-found]
 
         lens = Lens()
+        cell.set_output((cell.output, lens))
         if result.output is not None:
             output.append(result.output)
         output.append(lens)

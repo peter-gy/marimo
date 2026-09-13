@@ -84,3 +84,49 @@ async def test_broken_lens_does_not_interrupt_notebook(failure):
             if op.cell_id == "import" and op.output is not None
         ]
         assert "original output" in outputs[-1]
+
+
+async def test_lens_lifetime_preserves_cell_output():
+    import gc
+    import sys
+    import weakref
+    from importlib.machinery import ModuleSpec
+    from types import ModuleType
+
+    from marimo._plugins.ui._core.ui_element import UIElement
+
+    instances = []
+
+    class Lens:
+        def __init__(self):
+            instances.append(weakref.ref(self))
+
+        def _repr_html_(self):
+            return "<span>Lens</span>"
+
+    module = ModuleType("marimo_lens")
+    module.__spec__ = ModuleSpec("marimo_lens", loader=None)
+    module.Lens = Lens
+
+    with mocked_kernel_session() as session:
+        with patch.dict(sys.modules, marimo_lens=module):
+            await session.kernel.run(
+                [
+                    ExecuteCellCommand(
+                        cell_id="lens",
+                        code="import marimo as mo\nmo.ui.button()",
+                    )
+                ]
+            )
+        gc.collect()
+        assert instances[0]() is not None
+        cell = session.kernel.graph.cells["lens"]
+        assert isinstance(cell.output[0], UIElement)
+        previous_output = weakref.ref(cell.output[0])
+
+        await session.kernel.run(
+            [ExecuteCellCommand(cell_id="lens", code="1")]
+        )
+        gc.collect()
+        assert instances[0]() is None
+        assert previous_output() is None
