@@ -1,4 +1,5 @@
 # Copyright 2026 Marimo. All rights reserved.
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -38,7 +39,12 @@ async def test_lens_mount_and_rerun(expression):
 
 async def test_lens_absent():
     with mocked_kernel_session() as session:
-        with patch("importlib.util.find_spec", return_value=None):
+        with (
+            patch.dict(sys.modules, marimo_lens=None),
+            patch(
+                "marimo._runtime.runner.hooks_lens.LOGGER.warning"
+            ) as warning,
+        ):
             await session.kernel.run(
                 [
                     ExecuteCellCommand(
@@ -47,9 +53,13 @@ async def test_lens_absent():
                 ]
             )
         assert not session.kernel.errors
+        warning.assert_not_called()
 
 
-@pytest.mark.parametrize("failure", ["discovery", "import", "constructor"])
+@pytest.mark.parametrize(
+    "failure",
+    ["import", "dependency", "constructor", "constructor_missing_module"],
+)
 async def test_broken_lens_does_not_interrupt_notebook(failure):
     import sys
     from importlib.machinery import ModuleSpec
@@ -57,13 +67,25 @@ async def test_broken_lens_does_not_interrupt_notebook(failure):
     from unittest.mock import Mock
 
     broken_lens = ModuleType("marimo_lens")
-    if failure != "discovery":
-        broken_lens.__spec__ = ModuleSpec("marimo_lens", loader=None)
-    if failure == "constructor":
+    broken_lens.__spec__ = ModuleSpec("marimo_lens", loader=None)
+    if failure == "dependency":
+        broken_lens.__getattr__ = Mock(
+            side_effect=ModuleNotFoundError(name="anywidget")
+        )
+    elif failure == "constructor":
         broken_lens.Lens = Mock(side_effect=RuntimeError("broken Lens"))
+    elif failure == "constructor_missing_module":
+        broken_lens.Lens = Mock(
+            side_effect=ModuleNotFoundError(name="marimo_lens")
+        )
 
     with mocked_kernel_session() as session:
-        with patch.dict(sys.modules, marimo_lens=broken_lens):
+        with (
+            patch.dict(sys.modules, marimo_lens=broken_lens),
+            patch(
+                "marimo._runtime.runner.hooks_lens.LOGGER.warning"
+            ) as warning,
+        ):
             await session.kernel.run(
                 [
                     ExecuteCellCommand(
@@ -84,6 +106,7 @@ async def test_broken_lens_does_not_interrupt_notebook(failure):
             if op.cell_id == "import" and op.output is not None
         ]
         assert "original output" in outputs[-1]
+        warning.assert_called_once()
 
 
 async def test_lens_lifetime_preserves_cell_output():

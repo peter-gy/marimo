@@ -19,8 +19,6 @@ LOGGER = _loggers.marimo_logger()
 def mount_lens(
     cell: CellImpl, ctx: PostExecutionHookContext, result: RunResult
 ) -> None:
-    from importlib.util import find_spec
-
     del ctx
 
     if (
@@ -31,10 +29,12 @@ def mount_lens(
         return
 
     try:
-        if find_spec("marimo_lens") is None:
+        try:
+            from marimo_lens import Lens  # type: ignore[import-not-found]
+        except ModuleNotFoundError as exc:
+            if exc.name != "marimo_lens":
+                raise
             return
-
-        from marimo_lens import Lens  # type: ignore[import-not-found]
 
         lens = Lens()
         cell.set_output((cell.output, lens))
