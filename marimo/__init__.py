@@ -15,12 +15,6 @@ marimo is designed to be:
 """
 
 from sys import platform as _platform
-from typing import TYPE_CHECKING as _TYPE_CHECKING
-
-if _TYPE_CHECKING:
-    from marimo._ast.cell import CellImpl
-    from marimo._runtime.runner.hook_context import PostExecutionHookContext
-    from marimo._runtime.runner.result import RunResult
 
 if _platform == "emscripten":
     # Runtime modules imported below capture `threading.Thread` and
@@ -154,9 +148,6 @@ from marimo._runtime.capture import (
 )
 from marimo._runtime.context.utils import running_in_notebook
 from marimo._runtime.control_flow import MarimoStopError, stop
-from marimo._runtime.runner.hooks_post_execution import (
-    POST_EXECUTION_HOOKS as _post_execution_hooks,
-)
 from marimo._runtime.runtime import (
     app_meta,
     cli_args,
@@ -172,40 +163,3 @@ from marimo._save.save import cache, lru_cache, persistent_cache
 from marimo._server.asgi import create_asgi_app
 from marimo._sql.sql import sql
 from marimo._version import __version__
-
-
-# Imports are cached before notebook execution; mount in the importing cell.
-def _mount_lens(
-    cell: "CellImpl", ctx: "PostExecutionHookContext", result: "RunResult"
-) -> None:
-    from importlib.util import find_spec
-
-    del ctx
-
-    if (
-        not result.success()
-        or not running_in_notebook()
-        or cell.namespace_to_variable("marimo") is None
-    ):
-        return
-
-    try:
-        if find_spec("marimo_lens") is None:
-            return
-
-        from marimo_lens import Lens  # type: ignore[import-not-found]
-
-        lens = Lens()
-        cell.set_output((cell.output, lens))
-        if result.output is not None:
-            output.append(result.output)
-        output.append(lens)
-    except Exception:
-        from marimo import _loggers
-
-        _loggers.marimo_logger().warning(
-            "Failed to automatically mount marimo-lens", exc_info=True
-        )
-
-
-_post_execution_hooks.append(_mount_lens)
