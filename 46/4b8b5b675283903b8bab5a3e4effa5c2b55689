@@ -1,0 +1,27 @@
+marimo/_export/_nbconvert.py
+  s_ee2d30def7d746::t_4bec1a9ae018f1 14,26,30-32
+tests/_export/test_export_images.py
+  s_ee2d30def7d746::t_4bec1a9ae018f1 10-11,26,28-56
+marimo/_export/exporter.py
+  s_ee2d30def7d746::t_4bec1a9ae018f1 37
+tests/_export/test_exporter.py
+  s_ee2d30def7d746::t_4bec1a9ae018f1 2066,2101-2103,2105,2204,2240-2242,2244
+marimo/_export/_limits.py
+  s_ee2d30def7d746::t_4bec1a9ae018f1 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "464b8b5b675283903b8bab5a3e4effa5c2b55689",
+  "prompts": {},
+  "sessions": {
+    "s_ee2d30def7d746": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c504-390f-7722-9bd1-b562704a044a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
