@@ -1,0 +1,23 @@
+pyproject.toml
+  s_6a51d990bb8959::t_40686ab1915e97 107
+tests/snapshots/optional-dependencies-recommended.txt
+  s_6a51d990bb8959::t_40686ab1915e97 3
+.github/renovate.json5
+  s_6a51d990bb8959::t_40686ab1915e97 26,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8c6142027e596b9915603d713a4a808c3a7cea72",
+  "prompts": {},
+  "sessions": {
+    "s_6a51d990bb8959": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c4ad-ea9f-72d2-9a6c-01103986869c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
