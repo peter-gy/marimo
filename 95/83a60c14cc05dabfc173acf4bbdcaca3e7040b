@@ -1,0 +1,25 @@
+.github/renovate.json5
+  s_6a51d990bb8959::t_2c505ae0d4a641 26,28
+frontend/src/components/app-config/optional-features.tsx
+  s_6a51d990bb8959::t_2c505ae0d4a641 109-113
+tests/snapshots/optional-dependencies-recommended.txt
+  s_6a51d990bb8959::t_2c505ae0d4a641 3
+pyproject.toml
+  s_6a51d990bb8959::t_2c505ae0d4a641 107,311
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9583a60c14cc05dabfc173acf4bbdcaca3e7040b",
+  "prompts": {},
+  "sessions": {
+    "s_6a51d990bb8959": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c4ad-ea9f-72d2-9a6c-01103986869c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Péter Ferenc Gyarmati <dev.petergy@gmail.com>"
+    }
+  }
+}
